@@ -53,8 +53,8 @@ AW-FNO/
 
 ## Theoretical Foundation
 
-Ground in **Multiresolution Analysis (MRA)**, AW-FNO approximates any function $f \in L^2(\mathbb{R})$ via its decomposition:
-$$f(x) = \underbrace{\sum_{k} c_k \phi(x-k)}_{\text{Fourier Stream}} + \underbrace{\sum_{j \ge 0} \sum_{k} d_{j,k} \psi_{j,k}(x)}_{\text{Wavelet Stream}}$$
+Grounded in **Multiresolution Analysis (MRA)**, AW-FNO approximates any function $f \in L^2(\mathbb{R})$ via its decomposition:
+$$ f(x) = \underbrace{\sum_{k} c_k \phi_k(x)}_{\text{Fourier Stream}} + \underbrace{\sum_{j \ge 0} \sum_{k} d_{j,k} \psi_{j,k}(x)}_{\text{Wavelet Stream}} $$
 This provides a more complete representation of the underlying Sobolev space than FNO alone.
 
 ---
