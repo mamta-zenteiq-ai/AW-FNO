@@ -13,17 +13,17 @@ Breaking the frequency-localization trade-off in SciML by unifying global Spectr
 The AW-FNO architecture employs a dual-stream approach to represent complex physical fields:
 
 ### 1. The Fourier Stream (Global Low-Rank Approximation)
-Acts as a low-pass filter to capture the "macro-physics." By truncating high-frequency modes ($k_{max}$), it maintains a low-rank representation that ensures global structural consistency and computational efficiency.
-$$(\mathcal{K}v)(x) = \mathcal{F}^{-1}(R_{\phi} \cdot \mathcal{F}v)(x)$$
+Acts as a low-pass filter to capture the "macro-physics." By truncating high-frequency modes $k_{\text{max}}$, it maintains a low-rank representation that ensures global structural consistency and computational efficiency.
+$$ (\mathcal{K}v)(x) = \mathcal{F}^{-1}(R_{\phi} \cdot \mathcal{F}v)(x) $$
 
 ### 2. The Wavelet Stream (Local Singularity Tracking)
 Utilizes Discrete/Stationary Wavelet Transforms (DWT/SWT). Unlike Fourier modes, wavelets are compactly supported in both space and frequency, allowing the model to resolve spatially varying frequencies and non-periodic boundary conditions without spectral leakage.
 
 ### 3. The Latent Spatial Gate (Adaptive Delegation)
 A learnable spatial map $\alpha \in [0, 1]^{H \times W}$ computed from the local hidden state:
-$$\alpha = \sigma(W_{gate} * h + b_{gate})$$
+$$ \alpha = \sigma(W_{\text{gate}} * h + b_{\text{gate}}) $$
 The final operator output is the gated sum:
-$$\mathcal{K}_{AW}(h) = \alpha \odot \text{SpectralConv}(h) + (1 - \alpha) \odot \text{WaveletConv}(h)$$
+$$ \mathcal{K}_{AW}(h) = \alpha \odot \text{SpectralConv}(h) + (1 - \alpha) \odot \text{WaveletConv}(h) $$
 
 ---
 
@@ -54,7 +54,7 @@ AW-FNO/
 ## Theoretical Foundation
 
 Grounded in **Multiresolution Analysis (MRA)**, AW-FNO approximates any function $f \in L^2(\mathbb{R})$ via its decomposition:
-$$ f(x) = \underbrace{\sum_{k} c_k \phi_k(x)}_{\text{Fourier Stream}} + \underbrace{\sum_{j \ge 0} \sum_{k} d_{j,k} \psi_{j,k}(x)}_{\text{Wavelet Stream}} $$
+$$ f(x) = \underbrace{\sum_{k} c_k \phi(x-k)}_{\text{Fourier Stream}} + \underbrace{\sum_{j \ge 0} \sum_{k} d_{j,k} \psi_{j,k}(x)}_{\text{Wavelet Stream}} $$
 This provides a more complete representation of the underlying Sobolev space than FNO alone.
 
 ---
