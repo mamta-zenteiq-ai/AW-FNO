@@ -23,7 +23,7 @@ Utilizes Discrete/Stationary Wavelet Transforms (DWT/SWT). Unlike Fourier modes,
 A learnable spatial map $\alpha \in [0, 1]^{H \times W}$ computed from the local hidden state:
 $$\alpha = \sigma(W_{gate} * h + b_{gate})$$
 The final operator output is the gated sum:
-$$\mathcal{K}_{AW}(h) = \alpha \odot \text{SpectralConv}(h) + (1 - \alpha) \odot \text{WaveletConv}(h)$$
+$\mathcal{K}_{AW}(h) = \alpha \odot \text{SpectralConv}(h) + (1 - \alpha) \odot \text{WaveletConv}(h)$
 
 ---
 
