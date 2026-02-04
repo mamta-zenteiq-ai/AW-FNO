@@ -1,0 +1,12 @@
+torch
+torchvision
+torchaudio
+numpy
+scipy
+matplotlib
+PyWavelets
+pyyaml
+tqdm
+tensorboard
+h5py
+wandb
