@@ -1,15 +1,13 @@
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
+import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
-from torch.optim.lr_scheduler import StepLR
 import matplotlib.pyplot as plt
-import numpy as np
-import random
 import os
 import sys
 import time
+import numpy as np
 
 # Add project root to sys.path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -21,29 +19,57 @@ from awfno.utils.unit_gaussian_normalization import UnitGaussianNormalizer
 from awfno.utils.losses import LpLoss
 from awfno.utils.seed import set_seed
 
-def train_burgers():
-    # 0. Reproducibility
-    seed = 42
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
+class SobolevLoss(object):
+    """
+    H1 Sobolev Loss for 1D problems.
+    Computes a weighted sum of the relative L2 loss of the values 
+    and the relative L2 loss of the first-order derivatives.
+    """
+    def __init__(self, p=2, beta=1.0, eps=1e-8):
+        self.p = p
+        self.beta = beta  # Weight for the derivative term
+        self.eps = eps
 
+    def __call__(self, x, y):
+        """
+        x: (batch, spatial_dim)
+        y: (batch, spatial_dim)
+        """
+        # Ensure 2D (batch, N)
+        x = x.view(x.size(0), -1)
+        y = y.view(y.size(0), -1)
+        
+        # 1. Relative L2 Loss of values
+        diff_norm = torch.norm(x - y, self.p, dim=1)
+        y_norm = torch.norm(y, self.p, dim=1)
+        rel_l2 = diff_norm / (y_norm + self.eps)
+        
+        # 2. Relative L2 Loss of derivatives (H1 term)
+        # Using finite differences
+        dx_x = x[:, 1:] - x[:, :-1]
+        dx_y = y[:, 1:] - y[:, :-1]
+        
+        diff_grad_norm = torch.norm(dx_x - dx_y, self.p, dim=1)
+        y_grad_norm = torch.norm(dx_y, self.p, dim=1)
+        rel_h1 = diff_grad_norm / (y_grad_norm + self.eps)
+        
+        # Total Weighted Loss
+        return torch.mean(rel_l2 + self.beta * rel_h1)
+
+def train_burgers_h1():
     # 1. Configuration
     set_seed(42)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
     epochs = 500
-    batch_size = 32
+    batch_size = 20
     learning_rate = 1e-3
-    print_every = 50
+    print_every = 100
+    beta = 1.0  # Weight for H1 derivative term
     
     data_path = '/media/HDD/mamta_backup/datasets/fno/burgers'
-    results_dir = os.path.join(PROJECT_ROOT, 'results', 'fno_burgers')
+    results_dir = os.path.join(PROJECT_ROOT, 'results', 'fno_burgers_h1')
     os.makedirs(results_dir, exist_ok=True)
     
     # 2. Load Data
@@ -78,28 +104,29 @@ def train_burgers():
         n_modes=(16,),
         in_channels=1,
         out_channels=1,
-        hidden_channels=192, # Adjusted for ~1.7M parameters
+        hidden_channels=64,
         n_layers=4,
         positional_embedding="grid",
-        non_linearity=F.relu,  # Original FNO paper uses ReLU
-        norm=None,             # No block normalization in original FNO
-        use_channel_mlp=False, # Disabled for fair comparison
-        channel_mlp_dropout=0.0
+        non_linearity=F.relu,
+        norm=None,
+        use_channel_mlp=False
     ).to(device)
     
     optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
-    # Paper: StepLR, halve every 100 epochs (Li et al. 2021, Table 1)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.5)
     
-    criterion_rel = LpLoss(d=1, p=2, size_average=True)  # Returns mean rel-L2 per batch
+    # Use Sobolev (H1) Loss for training
+    criterion_h1 = SobolevLoss(p=2, beta=beta)
+    # Use standard Rel L2 for reporting/comparison
+    criterion_rel = LpLoss(d=1, p=2, size_average=True)
     
     # 5. Training Loop
     train_loss_history = []
-    test_loss_history = []
+    test_rel_history = []
     
     y_normalizer.to(device)
     
-    print(f"Starting FNO 1D ablation training (Rel L2) on Burgers for {epochs} epochs...")
+    print(f"Starting FNO 1D training (Sobolev H1 Loss) on Burgers for {epochs} epochs...")
     start_time = time.time()
     
     for epoch in range(1, epochs + 1):
@@ -112,14 +139,15 @@ def train_burgers():
             optimizer.zero_grad()
             out = model(batch_x)
             
-            # Train using Relative L2 Loss
-            loss = criterion_rel(out.view(out.size(0), -1), batch_y.view(batch_y.size(0), -1))
+            # Train using H1 Sobolev Loss
+            # out shape: (B, 1, L) -> flatten to (B, L)
+            loss = criterion_h1(out.view(out.size(0), -1), batch_y.view(batch_y.size(0), -1))
             loss.backward()
             optimizer.step()
             
             train_loss += loss.item()
             
-        train_loss /= len(train_loader)  # Mean over batches (each batch already averaged)
+        train_loss /= len(train_loader)
         train_loss_history.append(train_loss)
         
         # Validation
@@ -131,70 +159,93 @@ def train_burgers():
                 out = model(batch_x)
                 out = y_normalizer.decode(out)
                 
-                # Report error on decoded (original scale) data
+                # Report standard Rel L2 error on decoded data
                 test_rel += criterion_rel(out, batch_y).item()
                 
-        test_rel /= len(test_loader)  # Mean over batches
-        test_loss_history.append(test_rel)
+        test_rel /= len(test_loader)
+        test_rel_history.append(test_rel)
         
         scheduler.step()
         
         if epoch % print_every == 0 or epoch == 1:
             print(f"Epoch {epoch}/{epochs} | "
-                  f"Train Rel L2: {train_loss:.6f} | "
+                  f"Train H1 Loss: {train_loss:.6f} | "
                   f"Test Rel L2: {test_rel:.6f}")
             
     total_time = time.time() - start_time
     print(f"Training completed in {total_time:.2f}s")
-    print(f"Final Test Relative L2 Error: {test_loss_history[-1]:.6f}")
+    print(f"Final Test Relative L2 Error: {test_rel_history[-1]:.6f}")
     
-    # 6. Plot Loss
-    plt.figure(figsize=(12, 5))
-    plt.subplot(1, 2, 1)
-    plt.plot(train_loss_history, label='Train Rel L2')
-    plt.plot(test_loss_history, label='Test Rel L2')
+    # 6. Plot Results
+    plt.figure(figsize=(15, 5))
+    
+    # Loss plot
+    plt.subplot(1, 3, 1)
+    plt.plot(train_loss_history, label='Train H1 Loss')
     plt.xlabel('Epoch')
-    plt.ylabel('Loss (Rel L2)')
-    plt.title('FNO Burgers Training History')
+    plt.ylabel('H1 Loss')
+    plt.title('FNO Burgers H1 Training Loss')
     plt.legend()
     
-    plt.subplot(1, 2, 2)
-    plt.semilogy(train_loss_history, label='Train Rel L2')
-    plt.semilogy(test_loss_history, label='Test Rel L2')
+    # Test error plot
+    plt.subplot(1, 3, 2)
+    plt.plot(test_rel_history, label='Test Rel L2', color='orange')
     plt.xlabel('Epoch')
-    plt.ylabel('Loss (Log Scale)')
-    plt.title('FNO Burgers Training History (Log)')
+    plt.ylabel('Relative L2')
+    plt.title('FNO Burgers Test Performance')
+    plt.legend()
+    
+    # Log scale loss
+    plt.subplot(1, 3, 3)
+    plt.semilogy(train_loss_history, label='Train H1 Loss')
+    plt.semilogy(test_rel_history, label='Test Rel L2')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss (Log)')
+    plt.title('Training History (Log Scale)')
     plt.legend()
     
     plt.tight_layout()
-    plt.savefig(os.path.join(results_dir, 'fno_burgers_loss_plot.png'))
-    print(f"Loss plot saved to {os.path.join(results_dir, 'fno_burgers_loss_plot.png')}")
+    plt.savefig(os.path.join(results_dir, 'fno_burgers_h1_loss_plot.png'))
+    print(f"Results plot saved to {os.path.join(results_dir, 'fno_burgers_h1_loss_plot.png')}")
     
     # 7. Visualization of Results (Field Comparison)
     model.eval()
     with torch.no_grad():
-        # Get one sample from test set
         sample_x, sample_y = next(iter(test_loader))
         sample_x, sample_y = sample_x[0:1].to(device), sample_y[0:1].to(device)
         pred_y = model(sample_x)
         pred_y = y_normalizer.decode(pred_y)
         
-        # Move to CPU for plotting
         sample_y = sample_y.cpu().numpy().squeeze()
         pred_y = pred_y.cpu().numpy().squeeze()
         
-        plt.figure(figsize=(8, 5))
+        plt.figure(figsize=(14, 5))
+        
+        # Subplot 1: Field Comparison
+        plt.subplot(1, 2, 1)
         plt.plot(sample_y, label='Ground Truth', color='blue', linewidth=2)
-        plt.plot(pred_y, '--', label='FNO Prediction', color='red', linewidth=2)
-        plt.title(f'FNO Burgers 1D: GT vs Prediction (Rel L2: {test_loss_history[-1]:.4f})')
+        plt.plot(pred_y, '--', label='FNO-H1 Prediction', color='red', linewidth=2)
+        plt.title(f'FNO Burgers 1D (H1 Loss): GT vs Prediction\nTest Rel L2: {test_rel_history[-1]:.6f}')
         plt.xlabel('Spatial Domain')
         plt.ylabel('u(x, T=1)')
         plt.legend()
         plt.grid(True, alpha=0.3)
         
-        field_plot_path = os.path.join(results_dir, 'fno_burgers_field_comparison.png')
+        # Subplot 2: Pointwise Error
+        plt.subplot(1, 2, 2)
+        error = np.abs(sample_y - pred_y)
+        plt.plot(error, color='green', linewidth=2, label='Abs Error')
+        plt.fill_between(range(len(error)), error, alpha=0.2, color='green')
+        plt.title(f'Pointwise Absolute Error\nMax Error: {np.max(error):.6f}')
+        plt.xlabel('Spatial Domain')
+        plt.ylabel('|Error|')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        field_plot_path = os.path.join(results_dir, 'fno_burgers_h1_field_comparison.png')
         plt.savefig(field_plot_path)
-        print(f"Field comparison plot saved to {field_plot_path}")
+        print(f"Field comparison with error plot saved to {field_plot_path}")
 
 if __name__ == "__main__":
-    train_burgers()
+    train_burgers_h1()

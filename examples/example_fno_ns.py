@@ -17,6 +17,7 @@ if PROJECT_ROOT not in sys.path:
 from awfno.models.fno import FNO
 from awfno.utils.unit_gaussian_normalization import UnitGaussianNormalizer
 from awfno.utils.losses import LpLoss
+from awfno.utils.seed import set_seed
 
 def train_ns():
     # 0. Reproducibility
@@ -30,6 +31,7 @@ def train_ns():
         torch.backends.cudnn.benchmark = False
 
     # 1. Configuration
+    set_seed(42)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
