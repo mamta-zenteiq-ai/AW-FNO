@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 import matplotlib.pyplot as plt
+import numpy as np
+import random
 import os
 import sys
 import time
@@ -17,6 +19,16 @@ from awfno.utils.unit_gaussian_normalization import UnitGaussianNormalizer
 from awfno.utils.losses import LpLoss
 
 def train_burgers():
+    # 0. Reproducibility
+    seed = 42
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
     # 1. Configuration
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")

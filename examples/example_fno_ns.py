@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 import matplotlib.pyplot as plt
+import numpy as np
+import random
 import os
 import sys
 import time
@@ -17,6 +19,16 @@ from awfno.utils.unit_gaussian_normalization import UnitGaussianNormalizer
 from awfno.utils.losses import LpLoss
 
 def train_ns():
+    # 0. Reproducibility
+    seed = 42
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
     # 1. Configuration
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
@@ -24,7 +36,7 @@ def train_ns():
     epochs = 100
     batch_size = 20
     learning_rate = 1e-3
-    print_every = 10
+    print_every = 50
     
     data_path = '/media/HDD/mamta_backup/datasets/fno/navier_stokes'
     results_dir = os.path.join(PROJECT_ROOT, 'results', 'fno_ns')
@@ -41,10 +53,10 @@ def train_ns():
     y_test = test_data['y'].float()
 
     if x_train.ndim == 3:
-        x_train = x_train.unsqueeze(1)
-        y_train = y_train.unsqueeze(1)
-        x_test = x_test.unsqueeze(1)
-        y_test = y_test.unsqueeze(1)
+        x_train = x_train.unsqueeze(1).unsqueeze(2) # [B, C, T, H, W]
+        y_train = y_train.unsqueeze(1).unsqueeze(2)
+        x_test = x_test.unsqueeze(1).unsqueeze(2)
+        y_test = y_test.unsqueeze(1).unsqueeze(2)
     
     # 3. Normalization
     x_normalizer = UnitGaussianNormalizer(x_train)
@@ -59,18 +71,18 @@ def train_ns():
     
     # 4. Model, Optimizer, Loss
     model = FNO(
-        n_modes=(12, 12),
+        n_modes=(1, 12, 12), # Added T modes = 1
         in_channels=1,
         out_channels=1,
-        hidden_channels=64,
+        hidden_channels=128, # Adjusted for ~5.6M parameters
         n_layers=4,
         positional_embedding="grid",
-        use_channel_mlp=True,
+        use_channel_mlp=False, # Disabled for fair comparison
         channel_mlp_dropout=0.0
     ).to(device)
     
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.5)
     
     criterion_mse = nn.MSELoss()
     criterion_rel = LpLoss(d=2, p=2, size_average=False)
@@ -161,7 +173,10 @@ def train_ns():
     
     plt.tight_layout()
     plt.savefig(os.path.join(results_dir, 'fno_ns_loss_plot.png'))
-    print(f"Loss plot saved to {os.path.join(results_dir, 'fno_ns_loss_plot.png')}")
+    # Save model
+    model_path = os.path.join(results_dir, 'fno_ns_best.pt')
+    torch.save(model.state_dict(), model_path)
+    print(f"Model saved to {model_path}")
 
 if __name__ == "__main__":
     train_ns()

@@ -93,3 +93,51 @@ class WaveConv2d(nn.Module):
             
         x = self.idwt((out_ft, out_coeff))
         return x
+
+class WaveConv3d(nn.Module):
+    """
+    3D Spatio-Temporal Wavelet Convolution using separable spatial and temporal 
+    wavelet convolutions. This avoids requiring PTWT while building a purely 
+    native PyTorch-Wavelets solution.
+    """
+    def __init__(self, in_channels, out_channels, level, size, wavelet='db4', mode='periodic'):
+        super(WaveConv3d, self).__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.level = level
+        self.size = size # (T, H, W)
+        self.wavelet = wavelet
+        self.mode = mode
+        
+        # Spatial Wavelet Convolution (H, W)
+        self.wave_xy = WaveConv2d(in_channels, out_channels, level, (size[1], size[2]), wavelet=wavelet, mode=mode)
+        # Temporal Wavelet Convolution (T)
+        self.wave_t = WaveConv1d(in_channels, out_channels, level, size[0], wavelet=wavelet, mode=mode)
+        
+        # Feature mixing
+        self.mixing = nn.Conv3d(out_channels * 2, out_channels, kernel_size=1)
+        nn.init.constant_(self.mixing.weight, 0)
+        nn.init.constant_(self.mixing.weight[:out_channels, :out_channels, :, :, :], 0.5)
+        nn.init.constant_(self.mixing.weight[:out_channels, out_channels:, :, :, :], 0.5)
+        nn.init.constant_(self.mixing.bias, 0)
+
+    def forward(self, x):
+        # x shape: (Batch, Channels, T, H, W)
+        B, C, T, H, W = x.shape
+        
+        # 1. Processing spatial dimensions (H, W) for all times
+        x_xy = x.permute(0, 2, 1, 3, 4).reshape(B * T, C, H, W)
+        out_xy = self.wave_xy(x_xy)
+        # Reshape back to (B, C, T, H, W)
+        out_xy = out_xy.reshape(B, T, self.out_channels, H, W).permute(0, 2, 1, 3, 4)
+        
+        # 2. Processing temporal dimension (T) for all spatial locations
+        # Move T to the last dimension for 1D convolution: (B*H*W, C, T)
+        x_t = x.permute(0, 3, 4, 1, 2).reshape(B * H * W, C, T)
+        out_t = self.wave_t(x_t)
+        # Slicing in case DWT/IDWT padded the temporal dimension (common for very short signals)
+        out_t = out_t[..., :T]
+        
+        # Mix the spatial and temporal wave features
+        expanded_out_t = out_t.reshape(B, H, W, self.out_channels, T).permute(0, 3, 4, 1, 2)
+        return self.mixing(torch.cat([out_xy, expanded_out_t], dim=1))
