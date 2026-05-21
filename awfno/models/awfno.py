@@ -102,6 +102,7 @@ class AWFNO1d(BaseModel):
         non_linearity: nn.Module = F.gelu,
         padding: int = 0,
         dropout: float = 0.0,
+        norm: Optional[str] = "layer_norm"
     ):
         super().__init__()
         self.in_channels = in_channels
