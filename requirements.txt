@@ -10,3 +10,6 @@ tqdm
 tensorboard
 h5py
 wandb
+tensorly
+tensorly-torch
+opt_einsum

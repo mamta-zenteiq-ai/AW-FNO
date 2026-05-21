@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 import matplotlib.pyplot as plt
+import tensorly 
+import tltorch
 import os
 import sys
 import time
@@ -18,7 +20,7 @@ from awfno.utils.losses import LpLoss
 
 def train():
     # 1. Configuration
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
     epochs = 100
@@ -26,14 +28,14 @@ def train():
     learning_rate = 1e-3
     print_every = 10  # Print after every 10 epochs
     
-    data_path = '/media/HDD/mamta_backup/datasets/fno/darcy'
+    data_path = 'data/navier_stokes'
     results_dir = os.path.join(PROJECT_ROOT, 'results')
     os.makedirs(results_dir, exist_ok=True)
     
     # 2. Load Data
     print("Loading data...")
-    train_data = torch.load(os.path.join(data_path, 'darcy_train_32.pt'))
-    test_data = torch.load(os.path.join(data_path, 'darcy_test_32.pt'))
+    train_data = torch.load(os.path.join(data_path, 'nsforcing_train_128.pt'))
+    test_data = torch.load(os.path.join(data_path, 'nsforcing_test_128.pt'))
     
     x_train = train_data['x'].unsqueeze(1).float() # (B, 1, 32, 32)
     y_train = train_data['y'].unsqueeze(1).float() # (B, 1, 32, 32)
