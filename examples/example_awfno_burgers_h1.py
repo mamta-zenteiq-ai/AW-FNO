@@ -4,15 +4,55 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 import matplotlib.pyplot as plt
-import os
+import os 
+'''
+os is used to manage things outside of python - the operating system. 
+os(operating system) module is used to interact with the file system, allowing us to create directories, save files, 
+and manage paths in a platform-independent way (works for different operating systems like Linux, Windows, macOS).
+
+ In this code, we use os to create a results directory and save plots.
+'''
 import sys
+'''
+sys(system) means the python runtime environment itself - the software that executes the python code - which acts as 
+the bridge between the code we write (python script) and the underlying operating system.
+The sys module provides access to some variables used or maintained by the Python interpreter and to functions that 
+interact strongly with the python interpreter. It does not care about the your hardware specs or how files are arranged 
+on your hard drive, it looks inward at the python process itself. It controls 1) what folders are allowed to be imported 
+as modules in python (using sys.path), and it allows us to modify that list of folders at runtime. 2) How should python 
+exit if program crashes or finishes (using sys.exit). 3) What version of python is running the code (using sys.version). 
+4) What command line arguments were passed while launching the python script (using sys.argv). 
+5) How to handle uncaught exceptions (using sys.excepthook).
+
+Here, we use sys.path to add the project root directory to the Python path,
+allowing us to import modules from the awfno package.
+'''
 import time
-import numpy as np
+'''
+This is used to track how long the training process takes. We record the start time before training and then calculate 
+the total time taken after training completes. This helps us understand the computational cost of training the model. 
+'''
+import numpy as np  # scientific computing library for handling arrays and numerical operations.
 
 # Add project root to sys.path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+'''
+1) __file__ : This is a special/ hidden variable in Python that contains the path to the current script. 
+# Here: __file__  = /home/gazania/zan_folder/AW-FNO/examples/example_awfno_burgers_h1.py --> absolute path 
+2) os.path.abspath(__file__) makes sure we have the absolute path (from root partition (/)) to the current script.
+3) os.path.dirname(...) gives us the directory containing the current script. It removes the last part of the path
+(the script name) and gives us the directory. So we get /home/gazania/zan_folder/AW-FNO/examples
+4) os.path.dirname(...) again gives us the parent directory, removing the 'examples' part,
+so we get /home/gazania/zan_folder/AW-FNO, which is the "PROJECT_ROOT".
+'''
 if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
+    sys.path.insert(0, PROJECT_ROOT) # This adds the "PROJECT_ROOT" to the list of directories that Python searches 
+    # when we do an import. By inserting it at index 0, we ensure that it is at the first position. 
+    '''
+    When python reaches from awfno.models.awfno import AWFNO1d, it looks through the directories in sys.path in order.
+    If it finds awfno package in the "PROJECT_ROOT" directory, it will import AWFNO1d from awfno.models.awfno.
+    '''
+
 
 from awfno.models.awfno import AWFNO1d
 from awfno.utils.unit_gaussian_normalization import UnitGaussianNormalizer
@@ -58,7 +98,7 @@ class SobolevLoss(object):
 
 def train_burgers_awfno_h1():
     # 1. Configuration
-    set_seed(42)
+    set_seed(42)  # same hyperparameters as FNO baseline for fair comparison.
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
@@ -66,40 +106,103 @@ def train_burgers_awfno_h1():
     batch_size = 20
     learning_rate = 1e-3
     print_every = 100
-    beta = 1.0  # Weight for H1 derivative term
+    beta = 0.1  # Weight for H1 derivative term
     
-    data_path = '/media/HDD/mamta_backup/datasets/fno/burgers'
+    data_path = '/media/HDD/mamta_backup/datasets/fno/burgers'  
+    '''
+    This is hardcoded for the particular euclid system. 
+    It points to the location where the preprocessed Burgers dataset is stored. 
+    You may need to change this path to where you have the dataset on your system.
+    '''
+
     results_dir = os.path.join(PROJECT_ROOT, 'results', 'awfno_burgers_h1')
+    '''
+    This constructs a path to save our output results. (like loss plots and field comparison plots).
+    It creates dynamically a "results" folder in the "PROJECT_ROOT" and then a subfolder "awfno_burgers_h1" for this specific 
+    experiment. So, results_dir = /home/gazania/zan_folder/AW-FNO/results/awfno_burgers_h1
+    '''
+
     os.makedirs(results_dir, exist_ok=True)
+    '''
+    This line physically creates the directory specified by results_dir in the file system if it does not already exist.
+    The "exist_ok=True" argument means that if the directory already exists (bcz of the previous runs),
+    it will not raise an error and will simply do nothing.
+    '''
     
     # 2. Load Data
     print("Loading 1D Burgers data...")
     train_data = torch.load(os.path.join(data_path, 'burgers_train_128.pt'))
     test_data = torch.load(os.path.join(data_path, 'burgers_test_128.pt'))
+    '''
+    1) .pt files are PyTorch's way of saving tensors and other objects like python dictionaries. 
+    These .pt (.pth) files are binary files (collection of 0s and 1s in a such way that they can be loaded 
+    back as tensors into the memory).
+    2) Here, we load the training and testing datasets for the 1D Burgers problem. Each of these files contains a 
+    dictionary with keys 'x' and 'y', where 'x' is the input (initial fluid velocity field at t=0) and 
+    'y' is the output (fluid velocity field at final time t=1 or t=T).
+    3) torch.load() reads and deserializes(deserialization means converting from binary format back 
+    to Python objects (like dictionaries, lists, etc.)) the .pt file and gives us the original data structure
+    (in this case, a dictionary with tensors).
+    '''
     
-    x_train = train_data['x'].float()
+    x_train = train_data['x'].float() # Extract the input tensors from the training data by using the key 'x' 
+                                      # and convert it to (torch.float32) float type (32-bit floating point). 
+                                      # This is standard precision for training neural networks, as it provides a good
+                                      # balance between numerical precision and memory efficiency.
     y_train = train_data['y'].float()
     x_test = test_data['x'].float()
     y_test = test_data['y'].float()
+    print(f"Loaded data shapes - x_train: {x_train.shape}, y_train: {y_train.shape}, x_test: {x_test.shape}, y_test: {y_test.shape}")
 
-    if x_train.ndim == 2:
-        x_train = x_train.unsqueeze(1)
+    if x_train.ndim == 2:  
+        '''
+        .ndim is attribute in PyTorch that gives the number of dimensions of the tensor.
+        Here, we check if the input tensors are 2D (batch_size, spatial_grid(actually values at each grid point))).
+        For 128 grid points, the shape would be (num_samples, 128).
+        If the data is 2D, we need to add a channel dimension to make it compatible with the model which expects
+        (batch_size, in_channels, spatial_grid). For 1D problems, in_channels = 1 (typically).
+        '''
+        x_train = x_train.unsqueeze(1) # This adds a new dimension at index 1 (the channel dimension), 
+                                       # so the shape changes from (num_samples, 128) to (num_samples, 1, 128).
         y_train = y_train.unsqueeze(1)
         x_test = x_test.unsqueeze(1)
         y_test = y_test.unsqueeze(1)
     
     # 3. Normalization
     x_normalizer = UnitGaussianNormalizer(x_train)
+    '''
+    This creates an instance of the UnitGaussianNormalizer class for the input data (x_train).
+    The normalizer computes the mean and standard deviation of the training data.
+    '''
     x_train = x_normalizer.encode(x_train)
+    '''
+    This applies the normalization to the training data. The "encode()" method transforms the data to have 
+    zero mean and unit variance based on the statistics computed from the training data. 
+    Normalization is crucial for training neural networks as it helps with convergence and stability.
+    '''
     x_test = x_normalizer.encode(x_test)
+    '''
+    We also apply the same normalization to the test data using the same normalizer instance which has the mean and
+    std computed from the training data. In NN, we must never use mean and std from test data for normalization, as
+    it would lead to data leakage to the model.
+    '''
     
     y_normalizer = UnitGaussianNormalizer(y_train)
     y_train_norm = y_normalizer.encode(y_train)
+    '''
+    The original output data or ground truth (y_test) is not normalized, as we want to report the final test error 
+    in the original physical units (unscaled and in accordance with the real-world scale) for better interpretability 
+    and comparison with other methods.
+    '''
     
     train_loader = DataLoader(TensorDataset(x_train, y_train_norm), batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(TensorDataset(x_test, y_test), batch_size=batch_size, shuffle=False)
-    
-    # 4. Model, Optimizer, Loss
+    test_loader = DataLoader(TensorDataset(x_test, y_test), batch_size=batch_size, shuffle=False) 
+    '''
+    For evaluation, we set shuffle=False to maintain the order of the test samples, which can be useful 
+    for certain types of analysis or visualization. For training, we set shuffle=True to ensure that the model
+    sees the data in a different order each epoch, which can help with generalization and prevent overfitting.
+    '''
+
     model = AWFNO1d(
         in_channels=1,
         out_channels=1,
@@ -108,9 +211,10 @@ def train_burgers_awfno_h1():
         hidden_channels=64,
         n_layers=4,
         positional_embedding="grid",
-        non_linearity=F.gelu,
+        non_linearity=F.relu,
         padding=0,
-        dropout=0.0
+        dropout=0.0,
+        norm=None
     ).to(device)
     
     optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)

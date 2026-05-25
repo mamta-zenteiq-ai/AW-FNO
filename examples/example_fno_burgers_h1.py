@@ -66,7 +66,7 @@ def train_burgers_h1():
     batch_size = 20
     learning_rate = 1e-3
     print_every = 100
-    beta = 1.0  # Weight for H1 derivative term
+    beta = 0.1  # Weight for H1 derivative term
     
     data_path = '/media/HDD/mamta_backup/datasets/fno/burgers'
     results_dir = os.path.join(PROJECT_ROOT, 'results', 'fno_burgers_h1')

@@ -42,6 +42,7 @@ class AWFNOBlock1d(nn.Module):
         wno_wavelet: str = 'db6',
         non_linearity: nn.Module = F.gelu,
         dropout: float = 0.0,
+        norm: Optional[str] = "layer_norm",
     ):
         super().__init__()
         self.fno_conv = SpectralConv(
@@ -65,7 +66,10 @@ class AWFNOBlock1d(nn.Module):
             bias=True
         )
         self.gfm = AdaptiveGatedFusion1d(out_channels)
-        self.norm = nn.LayerNorm(out_channels)
+        if norm == "layer_norm" or norm == "layer":
+            self.norm = nn.LayerNorm(out_channels)
+        else:
+            self.norm = nn.Identity()
         self.non_linearity = non_linearity
         self.dropout = nn.Dropout(dropout) if dropout > 0.0 else nn.Identity()
 
@@ -102,6 +106,7 @@ class AWFNO1d(BaseModel):
         non_linearity: nn.Module = F.gelu,
         padding: int = 0,
         dropout: float = 0.0,
+        norm: Optional[str] = "layer_norm",
     ):
         super().__init__()
         self.in_channels = in_channels
@@ -140,7 +145,8 @@ class AWFNO1d(BaseModel):
                 wno_level=wno_level,
                 wno_wavelet=wno_wavelet,
                 non_linearity=non_linearity,
-                dropout=dropout
+                dropout=dropout,
+                norm=norm
             ))
         self.blocks = nn.ModuleList(blocks)
 
@@ -205,6 +211,7 @@ class AWFNOBlock2d(nn.Module):
         wno_wavelet: str = 'db6',
         non_linearity: nn.Module = F.gelu,
         dropout: float = 0.0,
+        norm: Optional[str] = "layer_norm",
     ):
         super().__init__()
         self.fno_conv = SpectralConv(
@@ -229,7 +236,10 @@ class AWFNOBlock2d(nn.Module):
         )
         # Gated Fusion Mechanism
         self.gfm = AdaptiveGatedFusion2d(out_channels)
-        self.norm = nn.LayerNorm(out_channels)
+        if norm == "layer_norm" or norm == "layer":
+            self.norm = nn.LayerNorm(out_channels)
+        else:
+            self.norm = nn.Identity()
         self.non_linearity = non_linearity
         self.dropout = nn.Dropout(dropout) if dropout > 0.0 else nn.Identity()
 
@@ -273,6 +283,7 @@ class AWFNO2d(BaseModel):
         non_linearity: nn.Module = F.gelu,
         padding: int = 0,
         dropout: float = 0.0,
+        norm: Optional[str] = "layer_norm",
     ):
         super().__init__()
         self.in_channels = in_channels
@@ -314,7 +325,8 @@ class AWFNO2d(BaseModel):
                 wno_level=wno_level,
                 wno_wavelet=wno_wavelet,
                 non_linearity=non_linearity,
-                dropout=dropout
+                dropout=dropout,
+                norm=norm
             ))
         self.blocks = nn.ModuleList(blocks)
 

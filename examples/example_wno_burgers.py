@@ -23,7 +23,7 @@ def train_burgers():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
-    epochs = 100
+    epochs = 500
     batch_size = 32
     learning_rate = 1e-3
     print_every = 10
@@ -71,7 +71,7 @@ def train_burgers():
     ).to(device)
     
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
     
     criterion_mse = nn.MSELoss()
     criterion_rel = LpLoss(d=1, p=2, size_average=False)

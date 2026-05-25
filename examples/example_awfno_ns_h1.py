@@ -70,11 +70,11 @@ def train_awfno_ns_h1():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
-    epochs = 100
-    batch_size = 10 # Reduced batch size for AW-FNO 2D if needed
+    epochs = 500
+    batch_size = 20
     learning_rate = 1e-3
     print_every = 10
-    beta = 1.0  # Weight for H1 derivative term
+    beta = 0.1  # Weight for H1 derivative term
     
     data_path = '/media/HDD/mamta_backup/datasets/fno/navier_stokes'
     results_dir = os.path.join(PROJECT_ROOT, 'results', 'awfno_ns_h1')
@@ -118,8 +118,8 @@ def train_awfno_ns_h1():
         positional_embedding="grid"
     ).to(device)
     
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.5)
     
     # Use 2D Sobolev (H1) Loss for training
     criterion_h1 = SobolevLoss2d(p=2, beta=beta)
@@ -173,12 +173,12 @@ def train_awfno_ns_h1():
         
         if epoch % print_every == 0 or epoch == 1:
             print(f"Epoch {epoch}/{epochs} | "
-                  f"Train H1 Loss: {train_loss:.6f} | "
-                  f"Test Rel L2: {test_rel:.6f}")
+                  f"Train H1 Loss: {train_loss:.8f} | "
+                  f"Test Rel L2: {test_rel:.8f}")
             
     total_time = time.time() - start_time
     print(f"Training completed in {total_time:.2f}s")
-    print(f"Final Test Relative L2 Error: {test_rel_history[-1]:.6f}")
+    print(f"Final Test Relative L2 Error: {test_rel_history[-1]:.8f}")
     
     # 6. Plot Loss History
     plt.figure(figsize=(10, 5))
@@ -229,7 +229,7 @@ def train_awfno_ns_h1():
         error = np.abs(sample_y - pred_y)
         plt.imshow(error, cmap='hot')
         plt.colorbar()
-        plt.title(f'Absolute Pointwise Error\nMax Error: {np.max(error):.6f}')
+        plt.title(f'Absolute Pointwise Error\nMax Error: {np.max(error):.8f}')
         
         plt.tight_layout()
         field_plot_path = os.path.join(results_dir, 'awfno_ns_h1_field_comparison.png')
