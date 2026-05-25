@@ -8,6 +8,7 @@ import random
 import os
 import sys
 import time
+import numpy as np
 
 # Add project root to sys.path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -35,7 +36,7 @@ def train_ns():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
-    epochs = 100
+    epochs = 500
     batch_size = 20
     learning_rate = 1e-3
     print_every = 50
@@ -149,11 +150,12 @@ def train_ns():
         
         if epoch % print_every == 0 or epoch == 1:
             print(f"Epoch {epoch}/{epochs} | "
-                  f"Train MSE: {train_mse:.6f}, Rel L2: {train_rel:.6f} | "
-                  f"Test MSE: {test_mse:.6f}, Rel L2: {test_rel:.6f}")
+                  f"Train MSE: {train_mse:.8f}, Rel L2: {train_rel:.8f} | "
+                  f"Test MSE: {test_mse:.8f}, Rel L2: {test_rel:.8f}")
             
     total_time = time.time() - start_time
     print(f"Training completed in {total_time:.2f}s")
+    print(f"Final Test Relative L2 Error: {test_rel_history[-1]:.8f}")
     
     # 6. Plot Loss
     plt.figure(figsize=(12, 5))
@@ -175,10 +177,7 @@ def train_ns():
     
     plt.tight_layout()
     plt.savefig(os.path.join(results_dir, 'fno_ns_loss_plot.png'))
-    # Save model
-    model_path = os.path.join(results_dir, 'fno_ns_best.pt')
-    torch.save(model.state_dict(), model_path)
-    print(f"Model saved to {model_path}")
+    print(f"Loss plot saved to {os.path.join(results_dir, 'fno_ns_loss_plot.png')}")
 
 if __name__ == "__main__":
     train_ns()

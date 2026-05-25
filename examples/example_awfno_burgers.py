@@ -32,7 +32,7 @@ def train_burgers():
         torch.backends.cudnn.benchmark = False
 
     # 1. Configuration
-    set_seed(42)  — same hyperparameters as FNO baseline for fair comparison
+    set_seed(42)  # — same hyperparameters as FNO baseline for fair comparison
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
 
@@ -72,7 +72,6 @@ def train_burgers():
     train_loader = DataLoader(TensorDataset(x_train, y_train_norm), batch_size=batch_size, shuffle=True)
     test_loader  = DataLoader(TensorDataset(x_test, y_test),        batch_size=batch_size, shuffle=False)
 
-    # 4. Model — same architectural width/depth as FNO baseline
     model = AWFNO1d(
         in_channels=1,
         out_channels=1,
@@ -83,9 +82,10 @@ def train_burgers():
         wno_level=3,
         wno_wavelet='db6',
         positional_embedding="grid",   # grid embedding, same as FNO
-        non_linearity=F.gelu,
+        non_linearity=F.relu,          # Use ReLU to match FNO
         padding=0,
-        dropout=0.0
+        dropout=0.0,
+        norm=None                      # Disable normalization to match FNO
     ).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)

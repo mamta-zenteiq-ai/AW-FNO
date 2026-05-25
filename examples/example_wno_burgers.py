@@ -83,8 +83,8 @@ def train_burgers():
         wavelet='db6'
     ).to(device)
     
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.5)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
     
     criterion_mse = nn.MSELoss()
     criterion_rel = LpLoss(d=1, p=2, size_average=False)
