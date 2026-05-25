@@ -44,7 +44,7 @@ warnings.filterwarnings("ignore")
 # ─────────────────────────────────────────────
 # CONFIG  –  change FILE_PATH if needed
 # ─────────────────────────────────────────────
-FILE_PATH   = "/media/HDD/mamta_backup/datasets/PDEBench/comp_ns/1d/1D_CFD_Sod7.hdf5"
+FILE_PATH   = "/media/HDD/mamta_backup/datasets/PDEBench/comp_ns/1d/1D_CFD_Sod5.hdf5"
 PLOT_DIR    = "plots"
 N_TRAJ_SHOW = 5        # trajectories to overlay in spread plots
 SEED        = 42

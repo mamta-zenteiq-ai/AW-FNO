@@ -189,8 +189,8 @@ def train_sod():
         n_modes=64,             # Fourier modes for 1D
         size=[lr_resolution],   # (256,) for input
         hidden_channels=64,
-        n_fno_layers=0,
-        n_wno_layers=8,
+        n_fno_layers=2,
+        n_wno_layers=2,
         wno_wavelet='db6',
         padding=0,
         dropout=0.0,
