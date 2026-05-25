@@ -76,14 +76,14 @@ def train_ns_h1():
     print_every = 10
     beta = 0.1  # Weight for H1 derivative term
     
-    data_path = '/media/HDD/mamta_backup/datasets/fno/navier_stokes'
+    data_path = '/home/parikshit/AW-FNO/awfno/data/navier_stokes'
     results_dir = os.path.join(PROJECT_ROOT, 'results', 'fno_ns_h1')
     os.makedirs(results_dir, exist_ok=True)
     
     # 2. Load Data
-    print("Loading Navier-Stokes (64x64) data for FNO-H1...")
-    train_data = torch.load(os.path.join(data_path, 'ns_train_64.pt'))
-    test_data = torch.load(os.path.join(data_path, 'ns_test_64.pt'))
+    print("Loading Navier-Stokes (128x128) data for FNO-H1...")
+    train_data = torch.load(os.path.join(data_path, 'ns_train_128.pt'))
+    test_data = torch.load(os.path.join(data_path, 'ns_test_128.pt'))
     
     x_train = train_data['x'].float()
     y_train = train_data['y'].float()
@@ -109,7 +109,7 @@ def train_ns_h1():
     
     # 4. Model, Optimizer, Loss
     model = FNO(
-        n_modes=(12, 12),
+        n_modes=(24, 24),
         in_channels=1,
         out_channels=1,
         hidden_channels=64,

@@ -13,3 +13,4 @@ wandb
 tensorly
 tensorly-torch
 opt_einsum
+pytorch-wavelets
