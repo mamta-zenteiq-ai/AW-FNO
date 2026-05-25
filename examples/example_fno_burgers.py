@@ -5,6 +5,8 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 from torch.optim.lr_scheduler import StepLR
 import matplotlib.pyplot as plt
+import numpy as np
+import random
 import os
 import sys
 import time
@@ -20,15 +22,25 @@ from awfno.utils.losses import LpLoss
 from awfno.utils.seed import set_seed
 
 def train_burgers():
+    # 0. Reproducibility
+    seed = 42
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
     # 1. Configuration
     set_seed(42)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
     epochs = 500
-    batch_size = 20
+    batch_size = 32
     learning_rate = 1e-3
-    print_every = 100
+    print_every = 50
     
     data_path = '/media/HDD/mamta_backup/datasets/fno/burgers'
     results_dir = os.path.join(PROJECT_ROOT, 'results', 'fno_burgers')
@@ -66,12 +78,13 @@ def train_burgers():
         n_modes=(16,),
         in_channels=1,
         out_channels=1,
-        hidden_channels=64,
+        hidden_channels=192, # Adjusted for ~1.7M parameters
         n_layers=4,
         positional_embedding="grid",
         non_linearity=F.relu,  # Original FNO paper uses ReLU
         norm=None,             # No block normalization in original FNO
-        use_channel_mlp=False  # Original FNO has no Channel MLP block
+        use_channel_mlp=False, # Disabled for fair comparison
+        channel_mlp_dropout=0.0
     ).to(device)
     
     optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)

@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 import matplotlib.pyplot as plt
+import numpy as np
+import random
 import os
 import sys
 import time
@@ -19,6 +21,16 @@ from awfno.utils.losses import LpLoss
 from awfno.utils.seed import set_seed
 
 def train_ns():
+    # 0. Reproducibility
+    seed = 42
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
     # 1. Configuration
     set_seed(42)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -27,7 +39,7 @@ def train_ns():
     epochs = 500
     batch_size = 20
     learning_rate = 1e-3
-    print_every = 10
+    print_every = 50
     
     data_path = '/media/HDD/mamta_backup/datasets/fno/navier_stokes'
     results_dir = os.path.join(PROJECT_ROOT, 'results', 'fno_ns')
@@ -44,10 +56,10 @@ def train_ns():
     y_test = test_data['y'].float()
 
     if x_train.ndim == 3:
-        x_train = x_train.unsqueeze(1)
-        y_train = y_train.unsqueeze(1)
-        x_test = x_test.unsqueeze(1)
-        y_test = y_test.unsqueeze(1)
+        x_train = x_train.unsqueeze(1).unsqueeze(2) # [B, C, T, H, W]
+        y_train = y_train.unsqueeze(1).unsqueeze(2)
+        x_test = x_test.unsqueeze(1).unsqueeze(2)
+        y_test = y_test.unsqueeze(1).unsqueeze(2)
     
     # 3. Normalization
     x_normalizer = UnitGaussianNormalizer(x_train)
@@ -62,13 +74,13 @@ def train_ns():
     
     # 4. Model, Optimizer, Loss
     model = FNO(
-        n_modes=(12, 12),
+        n_modes=(1, 12, 12), # Added T modes = 1
         in_channels=1,
         out_channels=1,
-        hidden_channels=64,
+        hidden_channels=128, # Adjusted for ~5.6M parameters
         n_layers=4,
         positional_embedding="grid",
-        use_channel_mlp=True,
+        use_channel_mlp=False, # Disabled for fair comparison
         channel_mlp_dropout=0.0
     ).to(device)
     
@@ -166,43 +178,6 @@ def train_ns():
     plt.tight_layout()
     plt.savefig(os.path.join(results_dir, 'fno_ns_loss_plot.png'))
     print(f"Loss plot saved to {os.path.join(results_dir, 'fno_ns_loss_plot.png')}")
-    
-    # 7. Visualization of Results
-    model.eval()
-    with torch.no_grad():
-        sample_x, sample_y = next(iter(test_loader))
-        sample_x, sample_y = sample_x[0:1].to(device), sample_y[0:1].to(device)
-        pred_y = model(sample_x)
-        pred_y = y_normalizer.decode(pred_y)
-        
-        sample_y = sample_y.cpu().numpy().squeeze()
-        pred_y = pred_y.cpu().numpy().squeeze()
-        
-        plt.figure(figsize=(18, 5))
-        
-        # Ground Truth
-        plt.subplot(1, 3, 1)
-        plt.imshow(sample_y, cmap='jet')
-        plt.colorbar()
-        plt.title('Ground Truth')
-        
-        # Prediction
-        plt.subplot(1, 3, 2)
-        plt.imshow(pred_y, cmap='jet')
-        plt.colorbar()
-        plt.title('Prediction')
-        
-        # Absolute Error
-        plt.subplot(1, 3, 3)
-        error = np.abs(sample_y - pred_y)
-        plt.imshow(error, cmap='hot')
-        plt.colorbar()
-        plt.title(f'Absolute Pointwise Error\nMax Error: {np.max(error):.8f}')
-        
-        plt.tight_layout()
-        field_plot_path = os.path.join(results_dir, 'fno_ns_field_comparison.png')
-        plt.savefig(field_plot_path)
-        print(f"Field plot saved to {field_plot_path}")
 
 if __name__ == "__main__":
     train_ns()

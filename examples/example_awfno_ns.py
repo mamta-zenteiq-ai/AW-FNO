@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 import matplotlib.pyplot as plt
+import numpy as np
+import random
 import os
 import sys
 import time
@@ -19,6 +21,16 @@ from awfno.utils.losses import LpLoss
 from awfno.utils.seed import set_seed
 
 def train_ns():
+    # 0. Reproducibility
+    seed = 42
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
     # 1. Configuration
     set_seed(42)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -27,7 +39,7 @@ def train_ns():
     epochs = 500
     batch_size = 20
     learning_rate = 1e-3
-    print_every = 10
+    print_every = 50
     
     data_path = '/media/HDD/mamta_backup/datasets/fno/navier_stokes'
     results_dir = os.path.join(PROJECT_ROOT, 'results', 'awfno_ns')
@@ -66,10 +78,11 @@ def train_ns():
         out_channels=1,
         n_modes=(12, 12),
         size=(64, 64),
-        hidden_channels=64, # Using 64 to match Burgers experiment capacity
+        hidden_channels=16, # Adjusted for ~7.2M parameters
         n_layers=4,
         padding=0,
-        dropout=0.0
+        dropout=0.0,
+        wno_wavelet='db6'
     ).to(device)
     
     optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)

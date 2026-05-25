@@ -1,0 +1,243 @@
+\documentclass[11pt,a4paper]{article}
+
+% ---------- FONT & LANGUAGE ----------
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{amsmath,amsfonts,amssymb}
+\let\Bbbk\relax
+\usepackage{newtxtext,newtxmath} % Times New Roman equivalent
+\usepackage[pdftex]{graphicx} 
+\usepackage{fancyhdr}
+\usepackage{svg}
+
+\usepackage{afterpage}
+\usepackage{setspace}
+\usepackage{bibspacing}
+\singlespacing
+
+
+% ---------- PAGE LAYOUT ----------
+\usepackage[a4paper,margin=2.5cm,
+  headheight=1.8cm,headsep=0.5cm]{geometry}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+
+
+% ---------- SECTION TITLES ----------
+\usepackage{titlesec}
+\titleformat{\section}
+  {\normalfont\bfseries\fontsize{12pt}{13.8pt}\selectfont}
+  {\thesection.}{0.5em}{}
+\titlespacing*{\section}{0pt}{12pt plus 2pt}{6pt}
+% \titlespacing{command}{left spacing}{before spacing}{after spacing}[right]
+% Spacing: how to read {12pt plus 4pt minus 2pt}
+% 12pt is what we would like the spacing to be.
+% plus 4pt means that TeX can stretch it by at most 4pt.
+% minus 2pt means that TeX can shrink it by at most 2pt.
+% This is one example of the concept of, 'glue', in TeX.
+
+\titleformat{\subsection}
+  {\normalfont\bfseries\fontsize{11pt}{12pt}\selectfont}
+  {\thesubsection\;}{0em}{}
+\titlespacing*{\subsection}{0pt}{6pt plus 1pt}{3pt}
+
+
+%% ---------- ICCFD13 HEADER ----------
+
+\pagestyle{fancy}
+\fancyhf{} % clear header and footer
+\fancyhead[L]{\raggedright \small \bf Thirteenth International Conference on       
+Computational Fluid Dynamics (ICCFD13)\\
+Milan, Italy, July 06-10, 2026\\
+}
+\fancyhead[R]{\thepage\\}
+
+\renewcommand{\headrulewidth}{0pt}
+
+
+% ---- Custom first-page style ----
+\fancypagestyle{firstpage}{
+\fancyhf{} % clear all header and footer fields
+\fancyhead[L]{\includegraphics[height=1.2cm]{iccfd13_banner}} % Logo on the left header
+
+
+\renewcommand{\headrulewidth}{0pt}
+}
+
+\setlength{\headsep}{0cm} % Adjust the space after the header
+
+%% TITLE
+\makeatletter
+\def\@maketitle{%
+  \thispagestyle{firstpage}% apply the custom header automatically
+  \begin{center}
+    \vspace*{0cm}
+    {\LARGE\bfseries \@title \par}
+    \vspace{6pt}
+    {\large \@author \par}
+    \vspace{0.5em}
+  \end{center}
+}
+\makeatother
+
+
+
+% Figure and equation label and reference:
+\newcommand{\equa}[1]{(\ref{eq:#1})}
+\newcommand{\laeq}[1]{\label{eq:#1}}
+\newcommand{\figu}[1]{\ref{fig:#1}}
+\newcommand{\lafi}[1]{\label{fig:#1}}
+
+\title{
+AW-FNO: An Adaptive approach for Fluid flow Super-resolution via Gated Wavelet-Fourier Learning
+}
+
+\author{Mamta Saini$^{**}$, Parikshit Mahajan$^{*}$, Gazania Marine Jyrwa$^{**}$, Diya Nagchaudhury$^{*}$, and Sashikumaar Ganesan$^{*,**}$\\
+Corresponding author: sashi@iisc.ac.in \\
+$^{*}$ Indian Institute of Science, Bengaluru, India.\\
+$^{**}$ ZenteiQ Aitech Innovations Pvt. Ltd.
+}
+\date{}
+
+
+
+% ---------- DOCUMENT ----------
+\begin{document}
+
+\maketitle
+\thispagestyle{firstpage}
+
+
+
+%%%% KEYWORDS
+%\vskip0.5cm
+\centerline{
+\begin{minipage}[t]{150mm}
+{\it Keywords:} Numerical algorithms, Scientific machine learning, Neural operators, Turbulent flows. \\
+\end{minipage}
+}
+
+
+
+
+\section{Introduction}
+
+% The numerical simulation of fluid flows, particularly at high Reynolds numbers, remains a significant challenge in fluid dynamics. The generation of high-fidelity (HF) data using Direct Numerical Simulation (DNS) is computationally intensive and demands substantial computational resources. Consequently, super-resolution (SR), defined as the reconstruction of high-resolution flow fields from low-resolution (LR) data, has emerged as an important area of research.
+
+% In turbulent flows, energy is transferred from large-scale eddies to the smaller scales. Standard CNNs are limited by local receptive fields. Recently, Neural Operators (NOs) have emerged as a powerful alternative to traditional CNN-based SR models. Unlike standard neural networks, NOs learn mappings between function spaces. Fourier Neural Operators (FNOs) excel at capturing global periodic features but often struggle with local discontinuities or sharp gradients.
+
+% This study introduces the Augmented wavelet Fourier Neural Operator (AW-FNO) that integrates the architectures of the Fourier Neural Operator (FNO) and the Wavelet Neural Operator (WNO). The approach leverages the spectral global efficiency of FNOs and the multi-resolution spatial localisation of WNOs. The methodology utilises a parallel kernel structure to process flow features at multiple scales.
+
+The study of Partial Differential Equations (PDEs) governs the physical dynamics of a system \cite{gurtin1982introduction}. Numerical methods solve PDEs with accuracy, but are computationally expensive. Particularly, fluid dynamics simulation at high Reynolds numbers becomes challenging due to the complexity of turbulent interactions. The high computational demand for generating high-fidelity (HF) data through Direct Numerical Simulation (DNS) makes it impractical for real-world applications. As a result, the reconstruction of high-resolution (HR) flow fields from low-resolution (LR) data, called Super Resolution (SR), is a focus of research.
+
+Turbulent flows transfer kinetic energy from coherent large-scale eddies to dissipative small-scale structures. Conventional Convolutional Neural Networks (CNNs) falter due to their spatially local impeding global coherence capture. Neural Operators (NOs) have recently been used for SR paradigms \cite{Wei2023SuperResolutionNO} as they learn resolution-invariant mappings between infinite-dimensional function spaces \cite{JMLR:v24:21-1524}. Fourier Neural Operators (FNOs) \cite{JMLR:v24:21-1524, li2021fourier}, leveraging fast Fourier transforms (FFTs) in the Fourier domain, resolve global periodicities but still falter at local discontinuities and sharp gradients.
+
+This work proposes the Augmented wavelet Fourier Neural Operator (AW-FNO), a synergistic architecture fusing the Fourier Neural Operator (FNO) \cite{li2021fourier} with the Wavelet Neural Operator (WNO) \cite{TRIPURA2023115783}. It combines FNO's spectral efficiency for non-local correlations with WNO's multi-resolution wavelet decomposition. A parallel kernel integration allows hierarchical feature extraction across scales, resulting in superior turbulent flow super-resolution with enhanced generalisation and computational efficiency.
+
+\section{Methodology}
+
+\subsection{The Architecture}
+
+We aim to learn an operator $\mathcal{G}: \mathcal{A} \to \mathcal{U}$ that maps a low-resolution input field $a \in \mathcal{A}$ to a high-resolution output field $u \in \mathcal{U}$.
+
+The core of our approach is the parallel spectral-wavelet layer. The input features are passed through two concurrent paths. The Fourier branch performs a Fast Fourier Transform (FFT), applies a learnable weight matrix to the low-frequency modes, and truncates high-frequency noise. This captures a global structure of the flow. The wavelet branch applies a Discrete Wavelet Transform (DWT) to decompose the signal into different scales. This helps the model learn localised refinements, such as eddies and boundary layer fluctuations.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=1\linewidth]{figures/arch.pdf}
+    \caption{Architecture of the Augmented Wavelet Fourier Neural Operator}
+    \label{fig:awfno}
+\end{figure}
+
+\subsection{Mathematical Formulation}
+
+The update for a hidden state $v_t$ to $v_{t+1}$ is defined by:
+
+\begin{equation}
+    v_{t+1}(x) = \sigma \left( W v_t(x) + (\mathcal{K}_{F} v_t)(x) + (\mathcal{K}_{W} v_t)(x) + b(x) \right),
+\end{equation}
+
+where $x$ is input from the domain, $W$ is a local linear Operator %transformation% 
+%(residual connection)%
+, $\mathcal{K}_{F}$ is the Fourier %integral% 
+kernel operator, defined as $(\mathcal{K}_{F}(\phi) \ast (v_t))(x)$ $=$ $\mathcal{F}^{-1}({R}_{\phi} \cdot \mathcal{F}(v_t))(x)$, where $\mathcal{F}$ is Fourier transform, $\mathcal{F}^{-1}$ is inverse Fourier transform, $R_\phi$ is a neural network-parameterized representation of the kernel $k$ in Fourier space with some parameter $\phi \in \mathcal{R}^{P}$.
+$\mathcal{K}_{W}$ is the Wavelet kernel operator, defined as 
+\begin{equation}
+(\mathcal{K}_{W}(\phi) \ast (v_t))(x) = \mathcal{W}^{-1}({R}_{\phi} \cdot \mathcal{W}(v_t))(x)
+\end{equation}
+where $\mathcal{W}$ is wavelet transform, $\mathcal{W}^{-1}$ is inverse wavelet transform, and  $R_\phi$ is a neural network-parameterized representation of the kernel $k$ in wavelet space with
+some parameter $\phi \in \mathcal{R}^{P}$. $b$ is a bias function and $\sigma$ is a non-linear activation function.
+
+\subsection{Adaptive Spatial Gate}
+
+% \textbf{Mechanism.} Adaptive Decisiveness via Entropic Regularization
+
+% The AW-FNO utilises an entropy-regularised objective function to overcome the "mean-field" stagnation common in multi-stream neural operators. In standard gating implementations, gradient descent often settles into a suboptimal equilibrium where both the Fourier and Wavelet branches are under-utilised. We introduce a Shannon Entropy penalty on the latent spatial gate $\alpha(x)$. This regularizer acts as a structural bottleneck, pushing the probability distribution of the gating activations toward a Bernoulli-like state. Mathematically, this enforces a local expert regime: \\
+% \textbf{Low-Entropy State.} The gate is forced to identify regions where the Fourier basis is numerically inefficient (e.g., near discontinuities) and switch entirely to the Wavelet basis.Resolution of Gibbs Phenomenon: By forcing the model to "turn off" the Fourier branch near shocks, we prevent the propagation of spectral ringing (Gibbs oscillations) into the final solution.
+
+% \subsection*{Key Advantages for the Paper}
+% \begin{itemize}
+%     \item \textbf{Decoupling.} It prevents the Fourier and Wavelet layers from co-adapting to the same features, ensuring true multiresolution decomposition.
+%     \item \textbf{Interpretability.} The resulting gate $\alpha(x)$ becomes a high-contrast map that identifies physical features (e.g., "The model used Wavelets here because there is a shock front").
+%     \item \textbf{Stability.} In complex-valued fields, this prevents phase-instabilities by forcing the model to choose a single representation for local phase singularities.
+% \end{itemize}
+
+FNO and WNO learn complementary features. The FNO branch operates in the Fourier domain to capture global structures and long-range correlations, whereas the WNO branch uses localised wavelet representations, which excel at representing sharp gradients and multiscale local features. Consequently, no single operator is uniformly optimal across the entire spatial domain: smoothly varying regions and strongly discontinuous regions demand different representational strengths.
+
+To exploit this complementary nature, we use the Adaptive Gated Fusion Mechanism (GFM) \cite{liu2025difffno} that performs spatially adaptive mixing of FNO and WNO features. Let 
+\[
+V_{\text{FNO}},\, V_{\text{WNO}} \in \mathbb{R}^{B \times H \times W \times C}
+\]
+
+represent the feature maps produced by FNO and WNO branches, respectively. We first concatenate these features along the channel dimension and then apply $1\times1$ convolution followed by a sigmoid activation to generate a gating map $\alpha \in \mathbb{R}^{B \times H \times W \times 1}$ :
+\[
+\alpha = \sigma\big(\mathrm{Conv}_{1\times 1}([V_{\text{FNO}},\, V_{\text{WNO}}])\big).
+\]
+
+The gate $\alpha$ at spatial location induces a piece-wise trust map that encodes the relative importance of FNO versus WNO. The fused representation is then obtained via an element-wise combination,
+
+\[
+V_{\text{fused}} = \alpha \odot V_{\text{FNO}} + (1 - \alpha) \odot V_{\text{WNO}},
+\]
+
+where the gating map is broadcast across the channel dimension. In regions where the underlying solution is smooth and globally coherent, the model learns \(\alpha \approx 1\), thereby prioritising the FNO branch and preserving large-scale consistency. Whereas, near the sharp interfaces, discontinuities or highly localised structures, the gate tends to shift to $0$, increasing the contribution of WNO and attenuating global spectral effects analogous to the Gibbs phenomenon that arise in purely Fourier-based representations. The GFM provides a router between the two experts, enabling data-dependent choice of expert while yielding a more robust and expressive hybrid operator.
+
+
+% \subsection{Loss function}
+% We use a loss function that ensures pixel-wise accuracy while also accounting for violations of the governing equation. 
+
+% \begin{equation*}
+%     L = L_{MSE} + \lambda L_{Physics}.
+% \end{equation*}
+
+
+\section{Conclusions}
+
+This work proposes AW-FNO, an adaptive hybrid neural operator that combines the complementary strengths of Fourier and Wavelet representations for fluid flow super-resolution. With the integration of a parallel architecture with an adaptive gated fusion mechanism, we are able to capture the localised multiscale features. The entropy-regularised gating strategy promotes decisive, spatially varying selection between the two operators, thereby enhancing robustness near sharp gradients and discontinuities, and reducing spectral artefacts, such as Gibbs oscillations.
+
+\textbf{The AW-FNO introduces a hybrid neural operator framework that synergistically integrates the global spectral efficiency of FNOs with the multi-resolution localisation of WNOs for super-resolving turbulent flows. The fusion of parallel kernel architecture and adaptive GFM enables spatially varying feature selection. The model learn to prioritise FNO for smooth, large-scale coherent structures and WNO for sharp gradients, discontinuities and small-scale eddies. This architectural design overcomes FNO's limitations such as Gibbs oscillations and spectral bias near local discontinuities, resulting in high fidelity reconstruction, enhanced generalisation across unseen resolutions and reduced computational overhead compared to traditional DNS or standalone NOs.}
+
+\textbf{Experiments demonstrate AW-FNO's robustness on high-Reynolds turbulent benchmarks, achieving zero-shot super-resolution. Future extensions could be dealing with 3D unstructured meshes via graph integrations, further bridging the gap toward real-time CFD surrogates.}
+
+
+
+
+
+
+%%%% BIBLIOGRAPHY
+\bibspacing=\dimen 10
+\bibliographystyle{unsrt} 
+\bibliography{biblio}
+
+
+\end{document}
+
+% Some suggestions (Harshdeep Sharma): 
+
+% Introduction should contain some references about what problem you are going to solve and why it matters. 
+% Secondly, you should try to show that the problem falls in the literature as a gap. 
+% Then, from a higher level, i see that you can move that 'The core .. flucutations' para in the Introduction itself. 
+% Also, Section 2 should start with Mathematical formulation and then section 3 or 2(b) can include the architecture or the numerical implementation details. 
+% Then currently, 'Key Advantages.. singularities' can be moved to the introduction or in conculsions. 
+% Before, Conclusions there will be a section on Results and Discussions. 

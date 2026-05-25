@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 import matplotlib.pyplot as plt
+import numpy as np
+import random
 import os
 import sys
 import time
@@ -13,12 +15,22 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from awfno.models.wno import WNO2d
+from awfno.models.wno import WNO3d
 from awfno.utils.unit_gaussian_normalization import UnitGaussianNormalizer
 from awfno.utils.losses import LpLoss
 from awfno.utils.seed import set_seed
 
 def train_ns():
+    # 0. Reproducibility
+    seed = 42
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
     # 1. Configuration
     set_seed(42)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -27,7 +39,7 @@ def train_ns():
     epochs = 500
     batch_size = 20
     learning_rate = 1e-3
-    print_every = 10
+    print_every = 50
     
     data_path = '/media/HDD/mamta_backup/datasets/fno/navier_stokes'
     results_dir = os.path.join(PROJECT_ROOT, 'results', 'wno_ns')
@@ -44,10 +56,10 @@ def train_ns():
     y_test = test_data['y'].float()
 
     if x_train.ndim == 3:
-        x_train = x_train.unsqueeze(1)
-        y_train = y_train.unsqueeze(1)
-        x_test = x_test.unsqueeze(1)
-        y_test = y_test.unsqueeze(1)
+        x_train = x_train.unsqueeze(1).unsqueeze(2)
+        y_train = y_train.unsqueeze(1).unsqueeze(2)
+        x_test = x_test.unsqueeze(1).unsqueeze(2)
+        y_test = y_test.unsqueeze(1).unsqueeze(2)
     
     # 3. Normalization
     x_normalizer = UnitGaussianNormalizer(x_train)
@@ -61,14 +73,15 @@ def train_ns():
     test_loader = DataLoader(TensorDataset(x_test, y_test), batch_size=batch_size, shuffle=False)
     
     # 4. Model, Optimizer, Loss
-    model = WNO2d(
+    model = WNO3d(
         in_channels=1,
         out_channels=1,
-        width=64, # Matching Burgers experiment capacity
-        size=(64, 64),
+        width=16, # Adjusted for parameter balance
+        size=(1, 64, 64),
         level=3,
         n_layers=4,
-        padding=0
+        padding=0,
+        wavelet='db6'
     ).to(device)
     
     optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
