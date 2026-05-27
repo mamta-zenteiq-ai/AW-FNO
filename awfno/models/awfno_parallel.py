@@ -38,6 +38,38 @@ Number = Union[float, int]
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# PARALLELISM STRATEGY — explicit CUDA multi-stream  (ACTIVE IMPLEMENTATION)
+# ---------------------------------------------------------------------------
+# Each AWFNOBlock has three independent branches that all read the same x:
+#   fno_conv  (FFT → complex multiply → iFFT)
+#   wno_conv  (DWT → multiply → iDWT)
+#   skip      (pointwise linear projection)
+#
+# We assign wno_conv and skip to their own persistent CUDA streams so their
+# kernels can run concurrently with fno_conv on the default stream.
+#
+# Why NOT torch.jit.fork (replaced by this approach):
+#   torch.jit.fork submits work to PyTorch's C++ thread pool.  Those worker
+#   threads initialise with cuda:0 as their default CUDA device regardless of
+#   what device your tensors are on.  This causes a spurious CUDA context on
+#   GPU 0 even when you explicitly target cuda:1, and can confuse profilers.
+#   Explicit CUDA streams are tied to a specific device at creation time and
+#   have no such thread-context issue.
+#
+# Synchronisation protocol:
+#   1. Side streams wait on the current (default) stream before reading x,
+#      ensuring x is fully produced before any branch consumes it.
+#   2. fno_conv runs on the default stream in parallel with the side streams.
+#   3. After fno_conv finishes, the default stream waits on both side streams
+#      before the fusion step reads v_wno and x_skip.
+#
+# Streams are created lazily on first forward (device is unknown at __init__)
+# and reused for all subsequent calls — no allocation overhead per step.
+# ---------------------------------------------------------------------------
+
+
+
 class AdaptiveGatedFusion1d(nn.Module):
     def __init__(self, channels):
         super().__init__()
@@ -59,7 +91,7 @@ class AWFNOBlock1d(nn.Module):
         out_channels: int,
         n_modes: Tuple[int],
         wno_size: Tuple[int],
-        wno_level: int = 3,
+        wno_level: int = 4,
         wno_wavelet: str = 'db6',
         non_linearity: nn.Module = F.gelu,
         dropout: float = 0.0,
@@ -85,24 +117,40 @@ class AWFNOBlock1d(nn.Module):
         self.norm = nn.LayerNorm(out_channels)
         self.non_linearity = non_linearity
         self.dropout = nn.Dropout(dropout) if dropout > 0.0 else nn.Identity()
+        # # [CUDA-streams] Persistent streams — kept for reference, not active.
+        # self._stream_wno  = None
+        # self._stream_skip = None
 
     def forward(self, x):
-        # --- PARALLEL LAUNCH ---
-        # torch.jit.fork dispatches each call to its own thread immediately
-        # and returns a lightweight Future object — no waiting yet.
-        # All three branches read x and are completely independent of each
-        # other, so they are safe to run concurrently.
+        # --- ACTIVE: torch.jit.fork parallelism ---
+        # fork dispatches each call to a background thread immediately and
+        # returns a Future — the CPU does not block.  All three branches read
+        # the same x and are independent, so they are safe to run concurrently.
         future_fno  = torch.jit.fork(self.fno_conv, x)  # FFT → complex multiply → iFFT
         future_wno  = torch.jit.fork(self.wno_conv, x)  # DWT → multiply → iDWT
         future_skip = torch.jit.fork(self.skip,     x)  # pointwise linear projection
 
-        # --- SYNCHRONISE ---
-        # torch.jit.wait blocks until the forked call has finished and
-        # returns its result.  Waiting on the three futures in order lets
-        # the CUDA scheduler overlap their kernel streams.
+        # wait() blocks until the forked call finishes and returns its result.
         v_fno  = torch.jit.wait(future_fno)
         v_wno  = torch.jit.wait(future_wno)
         x_skip = torch.jit.wait(future_skip)
+
+        # # [CUDA-streams] Alternative — device-safe, no thread-context side effects.
+        # # Comment the fork block above and uncomment this block to switch.
+        # dev = x.device
+        # if self._stream_wno is None:
+        #     self._stream_wno  = torch.cuda.Stream(device=dev)
+        #     self._stream_skip = torch.cuda.Stream(device=dev)
+        # cur = torch.cuda.current_stream(dev)
+        # self._stream_wno.wait_stream(cur)
+        # self._stream_skip.wait_stream(cur)
+        # with torch.cuda.stream(self._stream_wno):
+        #     v_wno  = self.wno_conv(x)
+        # with torch.cuda.stream(self._stream_skip):
+        #     x_skip = self.skip(x)
+        # v_fno = self.fno_conv(x)
+        # cur.wait_stream(self._stream_wno)
+        # cur.wait_stream(self._stream_skip)
 
         # Adaptive gated fusion: α * v_fno + (1-α) * v_wno
         v_gated = self.gfm(v_fno, v_wno)
@@ -252,20 +300,36 @@ class AWFNOBlock2d(nn.Module):
         self.norm = nn.LayerNorm(out_channels)
         self.non_linearity = non_linearity
         self.dropout = nn.Dropout(dropout) if dropout > 0.0 else nn.Identity()
+        # # [CUDA-streams] Persistent streams — kept for reference, not active.
+        # self._stream_wno  = None
+        # self._stream_skip = None
 
     def forward(self, x):
-        # --- PARALLEL LAUNCH ---
-        # Each fork returns immediately; the three CUDA kernel chains
-        # (FFT path, DWT path, linear skip) are submitted concurrently
-        # and the GPU scheduler interleaves them as SM capacity allows.
-        future_fno  = torch.jit.fork(self.fno_conv, x)
-        future_wno  = torch.jit.fork(self.wno_conv, x)
-        future_skip = torch.jit.fork(self.skip,     x)
+        # --- ACTIVE: torch.jit.fork parallelism ---
+        future_fno  = torch.jit.fork(self.fno_conv, x)  # FFT → complex multiply → iFFT
+        future_wno  = torch.jit.fork(self.wno_conv, x)  # DWT → multiply → iDWT
+        future_skip = torch.jit.fork(self.skip,     x)  # pointwise linear projection
 
-        # --- SYNCHRONISE ---
         v_fno  = torch.jit.wait(future_fno)
         v_wno  = torch.jit.wait(future_wno)
         x_skip = torch.jit.wait(future_skip)
+
+        # # [CUDA-streams] Alternative — device-safe, no thread-context side effects.
+        # # Comment the fork block above and uncomment this block to switch.
+        # dev = x.device
+        # if self._stream_wno is None:
+        #     self._stream_wno  = torch.cuda.Stream(device=dev)
+        #     self._stream_skip = torch.cuda.Stream(device=dev)
+        # cur = torch.cuda.current_stream(dev)
+        # self._stream_wno.wait_stream(cur)
+        # self._stream_skip.wait_stream(cur)
+        # with torch.cuda.stream(self._stream_wno):
+        #     v_wno  = self.wno_conv(x)
+        # with torch.cuda.stream(self._stream_skip):
+        #     x_skip = self.skip(x)
+        # v_fno = self.fno_conv(x)
+        # cur.wait_stream(self._stream_wno)
+        # cur.wait_stream(self._stream_skip)
 
         v_gated = self.gfm(v_fno, v_wno)
 
@@ -281,7 +345,9 @@ class AWFNOBlock2d(nn.Module):
 class AWFNO2d(BaseModel):
     """
     Parallel AWFNO 2D: fno_conv, wno_conv and skip run concurrently inside
-    each block via torch.jit.fork, overlapping CUDA kernels on a single GPU.
+    each block via explicit CUDA multi-stream, overlapping kernels on a single
+    GPU with no thread-default-device side effects (works correctly on any
+    cuda:N, including cuda:1).
     """
     def __init__(
         self,

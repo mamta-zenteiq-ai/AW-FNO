@@ -69,10 +69,15 @@ def train_awfno_ns_h1():
     # 1. Configuration
     set_seed(42)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    # Pins the default CUDA device for this process and all spawned threads.
+    # Without this, PyTorch's internal thread pool initialises worker threads
+    # with cuda:0 as their default context even when tensors live on cuda:1.
+    # if device.type == 'cuda':
+    #     torch.cuda.set_device(device)
     print(f"Using device: {device}")
     
     epochs = 500
-    batch_size = 20
+    batch_size = 64
     learning_rate = 1e-3
     print_every = 10
     beta = 0.1  # Weight for H1 derivative term
