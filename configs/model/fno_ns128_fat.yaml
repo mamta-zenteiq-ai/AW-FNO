@@ -1,0 +1,29 @@
+# Parameter-matched ("fat") FNO baseline for the NS-forcing 128×128 SR task.
+#
+# Identical to fno_ns128.yaml except hidden_channels is raised 32 → 128.
+# Purpose: answer the reviewer fairness question — does simply giving FNO
+# more capacity close the gap to AW-FNO, or is the dual-branch / gated
+# fusion doing something a wider FNO cannot?  (Plan A1, fat-FNO row.)
+name: fno
+
+in_channels: 1
+out_channels: 1
+
+n_modes: [20, 20]
+hidden_channels: 128
+n_layers: 4
+
+lifting_channel_ratio: 2
+projection_channel_ratio: 2
+positional_embedding: grid
+
+use_channel_mlp: true
+channel_mlp_expansion: 0.5
+channel_mlp_dropout: 0.0
+channel_mlp_skip: soft-gating
+fno_skip: linear
+
+norm: null
+domain_padding: null
+fno_block_precision: full
+stabilizer: null

@@ -1,0 +1,30 @@
+# PDEBench 1D Burgers equation (Nu=0.001 shock regime).
+#
+# File: 1D_Burgers_Sols_Nu0.001.hdf5  (PDEBench, DOI 10.18419/darus-2986)
+# Format: HDF5 with single 'tensor' key, shape (N=10000, T=201, X=1024)
+# Task: predict u(x, T) from u(x, 0).  Random IC; sharp travelling shock
+#       develops by t=T.  Periodic boundary conditions on x ∈ [0, 1].
+#
+# This is the canonical "FNO failure case" — Gibbs oscillations are
+# numerically observable at the shock front at the standard resolution.
+name: pdebench_burgers
+
+data_path: /media/HDD/mamta_backup/datasets/PDEBench/burgers
+
+# Task formulation: "initial_to_final" or "next_step"
+task: initial_to_final
+
+# Sample split (90% train / 10% test, then capped)
+n_train: 9000
+n_test: 1000
+train_frac: 0.9
+
+# Filename viscosity tag — loader will open 1D_Burgers_Sols_Nu{tag}.hdf5
+viscosity_tag: "0.001"
+
+# Spatial resolution (fixed by file format)
+resolution: 1024
+
+batch_size: 64
+seed: 42
+normalisation: unitgaussian

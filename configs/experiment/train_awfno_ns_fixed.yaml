@@ -1,0 +1,38 @@
+# AW-FNO retraining after gate-collapse mitigation.
+#
+# Mitigations applied (vs `train_awfno_ns.yaml`):
+#   B. Random Gaussian init on the gate Conv (std=0.2) instead of zero init.
+#      Breaks the α=0.5 saddle point in the entropy landscape.
+#   A. Entropy penalty added to training loss: L_total = L_data + λ_ent * H(α).
+#      Actively rewards decisive routing.
+#
+# Original run with zero init + no penalty:
+#   epoch 50: gate_H = 0.6903 (uniform = 0.6931)  → collapsed
+#   epoch 50: test_rel_l2 = 0.003724
+experiment_name: awfno_ns_fixed
+model: awfno_ns
+dataset: ns2d
+
+# Entropy penalty coefficient.  Start at 0.01.  If gate stays flat by epoch
+# 100, bump to 0.05.
+lambda_ent: 0.01
+
+epochs: 500
+learning_rate: 1.0e-3
+weight_decay: 1.0e-4
+optimizer: adam
+scheduler: step
+scheduler_step_size: 100
+scheduler_gamma: 0.5
+
+seed: 42
+device: cuda
+amp: false
+grad_clip: 1.0
+
+log_every: 25      # tighter logging — we're monitoring gate behaviour
+save_every: 100
+use_wandb: false
+wandb_project: aw-fno
+
+output_dir: /media/HDD/mamta_backup/aw_fno_results/awfno_ns_fixed

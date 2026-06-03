@@ -1,0 +1,22 @@
+# JHTDB forced isotropic turbulence (isotropic4096) — 128^2 spatial
+# super-resolution (4x). Drop-in second SR benchmark mirroring nsforcing_sr,
+# so the existing fno_ns128 / wno_ns128 / awfno_ns128 model configs are reused
+# unchanged. Genuinely intermittent high-Re turbulence: vortex-filament gate
+# target (high |grad u|), NOT wall-distance.
+#
+# Data: 23 velocity_cutout_x*_*.npy, each (z=1024, y=1024, x=4, V=3). Each
+# 1024^2 (z,y) plane of each velocity component is tiled into 128^2 patches;
+# train/test split by chunk (held-out streamwise stations).
+name: jhtdb_iso_sr
+
+data_path: /media/HDD/anjali/gazania_transolver/jhtdb_datasets
+
+downsample_factor: 4        # 128 -> 32 LR, then bicubic up to 128
+patch_size: 128
+n_train: 8000
+n_test: 2000
+test_chunk_frac: 0.2        # last ~20% of chunks held out
+components: [0, 1, 2]       # u, v, w treated as independent scalar fields
+
+batch_size: 16
+seed: 42

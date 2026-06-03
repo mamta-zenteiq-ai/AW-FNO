@@ -1,0 +1,32 @@
+# AW-FNO with adaptive gate on PDEBench Burgers Nu=0.001 (shock regime).
+#
+# Primary contribution test: does the gate route to WNO at the shock front?
+# Uses the mitigated setup from Phase 1 learnings:
+#   • Random Gaussian gate init (in awfno.py source)
+#   • Entropy penalty λ_ent = 0.01 (rewards decisive routing)
+experiment_name: awfno_pdebench_burgers
+
+model: awfno_pdebench_burgers
+dataset: pdebench_burgers
+
+lambda_ent: 0.01
+
+epochs: 500
+learning_rate: 1.0e-3
+weight_decay: 1.0e-4
+optimizer: adam
+scheduler: step
+scheduler_step_size: 100
+scheduler_gamma: 0.5
+
+seed: 42
+device: cuda
+amp: false
+grad_clip: 1.0
+
+log_every: 25
+save_every: 100
+use_wandb: false
+wandb_project: aw-fno
+
+output_dir: /media/HDD/mamta_backup/aw_fno_results/awfno_pdebench_burgers

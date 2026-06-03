@@ -1,0 +1,30 @@
+experiment_name: awfno_ns
+
+model: awfno_ns          # references configs/model/awfno_ns.yaml
+dataset: ns2d            # references configs/dataset/ns2d.yaml
+
+# ---- Optimisation ----
+epochs: 500
+learning_rate: 1.0e-3
+weight_decay: 1.0e-4
+optimizer: adam
+scheduler: step
+scheduler_step_size: 100
+scheduler_gamma: 0.5
+
+# ---- Reproducibility ----
+seed: 42
+
+# ---- Infrastructure ----
+device: cuda            # cuda | cpu | auto
+amp: false              # automatic mixed precision
+grad_clip: 1.0          # gradient clipping (null = off)
+
+# ---- Logging ----
+log_every: 50           # print every N epochs
+save_every: 100         # checkpoint every N epochs
+use_wandb: false
+wandb_project: aw-fno
+
+# ---- Output ----
+output_dir: results/awfno_ns

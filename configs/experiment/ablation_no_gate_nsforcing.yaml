@@ -1,0 +1,34 @@
+# Ablation: AW-FNO with the adaptive gate disabled (fixed α = 0.5) on the
+# NS-forcing 128×128 SR task.
+#
+# This is Phase 1's winner on homogeneous turbulence. On the SR task it tests
+# the "homogeneous → uniform mixing is optimal" theory: if forced NS at this
+# Re is statistically homogeneous, fixed α=0.5 should match or beat adaptive
+# gating, mirroring Phase 1. (Plan A1, "AW-FNO fixed α=0.5" row.)
+experiment_name: awfno_nsforcing_sr_no_gate
+
+model: awfno_ns128
+dataset: nsforcing_sr
+
+# Ablation flag: disables adaptive gate, uses fixed 0.5 / 0.5 mix
+ablation_fixed_gate: true
+
+epochs: 500
+learning_rate: 1.0e-3
+weight_decay: 1.0e-4
+optimizer: adam
+scheduler: step
+scheduler_step_size: 100
+scheduler_gamma: 0.5
+
+seed: 42
+device: cuda
+amp: false
+grad_clip: 1.0
+
+log_every: 25
+save_every: 100
+use_wandb: false
+wandb_project: aw-fno
+
+output_dir: results/awfno_nsforcing_sr_no_gate

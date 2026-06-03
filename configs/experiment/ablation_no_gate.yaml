@@ -1,0 +1,28 @@
+# Ablation: AW-FNO with gate disabled (fixed alpha = 0.5)
+# This proves the adaptive gating mechanism contributes to performance.
+experiment_name: awfno_ns_no_gate
+model: awfno_ns
+dataset: ns2d
+
+# Ablation flag: disables adaptive gate, uses fixed 0.5 / 0.5 mix
+ablation_fixed_gate: true
+
+epochs: 500
+learning_rate: 1.0e-3
+weight_decay: 1.0e-4
+optimizer: adam
+scheduler: step
+scheduler_step_size: 100
+scheduler_gamma: 0.5
+
+seed: 42
+device: cuda
+amp: false
+grad_clip: 1.0
+
+log_every: 50
+save_every: 100
+use_wandb: false
+wandb_project: aw-fno
+
+output_dir: results/awfno_ns_no_gate

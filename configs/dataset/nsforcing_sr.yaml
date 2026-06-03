@@ -1,0 +1,31 @@
+# Forced Navier-Stokes 2D — Spatial Super-Resolution dataset.
+#
+# Source: nsforcing_{train,test}_128.pt
+# Setup:  HR target = 128×128 vorticity snapshot
+#         LR input  = avg-pool(snapshot, factor) → bicubic-upsample back to 128×128
+#
+# This is the dataset used to justify the paper's "super-resolution" framing.
+name: nsforcing_sr
+
+data_path: data/nsforcing
+train_file: nsforcing_train_128.pt
+test_file: nsforcing_test_128.pt
+
+# Sample caps (total available: 10000 train / variable test).
+n_train: 8000
+n_test: 2000
+
+# Spatial resolution (HR).
+resolution: 128
+
+# 4× super-resolution: LR is 32×32 before bicubic upsampling.
+downsample_factor: 4
+
+# Which snapshot to use as the target field.
+# "y" = future vorticity (preferred, contains more turbulent structure)
+# "x" = initial vorticity
+snapshot: y
+
+batch_size: 16
+seed: 42
+normalisation: unitgaussian

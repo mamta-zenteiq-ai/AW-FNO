@@ -1,0 +1,27 @@
+# Ablation: AW-FNO with additive fusion (v_F + v_W) on PDEBench Burgers Nu=0.001.
+experiment_name: awfno_pdebench_burgers_additive
+
+model: awfno_pdebench_burgers
+dataset: pdebench_burgers
+
+ablation_additive_fusion: true
+
+epochs: 500
+learning_rate: 1.0e-3
+weight_decay: 1.0e-4
+optimizer: adam
+scheduler: step
+scheduler_step_size: 100
+scheduler_gamma: 0.5
+
+seed: 42
+device: cuda
+amp: false
+grad_clip: 1.0
+
+log_every: 25
+save_every: 100
+use_wandb: false
+wandb_project: aw-fno
+
+output_dir: /media/HDD/mamta_backup/aw_fno_results/awfno_pdebench_burgers_additive

@@ -1,0 +1,36 @@
+name: awfno
+variant: v1          # v1=per-layer GFM, v2=branch-parallel
+
+# Spatial dimensions of input field
+in_channels: 1
+out_channels: 1
+
+# Fourier modes to retain per spatial dimension
+n_modes: [12, 12]
+
+# Spatial grid size (must match dataset resolution)
+size: [64, 64]
+
+# Latent channel width
+hidden_channels: 32
+
+# Number of AW-FNO blocks
+n_layers: 4
+
+# Wavelet settings
+wno_level: 3
+wno_wavelet: db6
+
+# Lifting / projection MLP width multipliers
+lifting_channel_ratio: 2
+projection_channel_ratio: 2
+
+# Positional encoding: grid appends (x,y) coordinates
+positional_embedding: grid
+
+# Periodic spatial padding to reduce boundary artifacts
+padding: 0
+
+# Regularisation
+dropout: 0.0
+norm: layer_norm
