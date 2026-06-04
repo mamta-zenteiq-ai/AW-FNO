@@ -15,7 +15,8 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 # from awfno.models.awfno import AWFNO2d
-from awfno.models.awfno_parallel import AWFNO2d, AWFNO2dDualGPU
+# from awfno.models.awfno_parallel import AWFNO2d, AWFNO2dDualGPU
+from awfno.models.awfno_finalagfm import AWFNO2dFinalAGFM
 from awfno.utils.unit_gaussian_normalization import UnitGaussianNormalizer
 from awfno.utils.losses import LpLoss
 from awfno.utils.seed import set_seed
@@ -77,7 +78,7 @@ def train_awfno_ns_h1():
     print(f"Using device: {device}")
     
     epochs = 500
-    batch_size = 64
+    batch_size = 20
     learning_rate = 1e-3
     print_every = 10
     beta = 0.1  # Weight for H1 derivative term
@@ -148,11 +149,11 @@ def train_awfno_ns_h1():
     #     positional_embedding="grid"
     # ).to(device)
 
-    # For Parallelizing on 2 GPUs — uncomment below and comment out AWFNO2d block above
-    # IMPORTANT: do NOT call .to(device) here — AWFNO2dDualGPU places each
-    # sub-module on the correct GPU internally; calling .to() would move
-    # wno_conv back to cuda:0 and silently break the dual-GPU setup.
-    model = AWFNO2dDualGPU(
+    # AW-FNO with single AGFM at the end — two independent T-layer branches,
+    # fused once after both finish (matches LaTeX description exactly).
+    # c_gated=1  → spatial gating (empirically better, paper default).
+    # c_gated=64 → per-channel gating (set equal to hidden_channels).
+    model = AWFNO2dFinalAGFM(
         in_channels=1,
         out_channels=1,
         n_modes=(24, 24),
@@ -160,9 +161,24 @@ def train_awfno_ns_h1():
         hidden_channels=64,
         n_layers=4,
         positional_embedding="grid",
-        fno_device='cuda:0',   # RTX A6000  — fno_conv + skip + fusion
-        wno_device='cuda:1',   # RTX 6000 Ada — wno_conv
-    )
+        c_gated=1,
+    ).to(device)
+
+    # For Parallelizing on 2 GPUs — uncomment below and comment out AWFNO2d block above
+    # IMPORTANT: do NOT call .to(device) here — AWFNO2dDualGPU places each
+    # sub-module on the correct GPU internally; calling .to() would move
+    # wno_conv back to cuda:0 and silently break the dual-GPU setup.
+    # model = AWFNO2dDualGPU(
+    #     in_channels=1,
+    #     out_channels=1,
+    #     n_modes=(24, 24),
+    #     size=(128, 128),
+    #     hidden_channels=64,
+    #     n_layers=4,
+    #     positional_embedding="grid",
+    #     fno_device='cuda:0',   # RTX A6000  — fno_conv + skip + fusion
+    #     wno_device='cuda:1',   # RTX 6000 Ada — wno_conv
+    # )
 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.5)
