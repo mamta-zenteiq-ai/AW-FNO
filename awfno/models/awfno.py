@@ -15,12 +15,13 @@ Number = Union[float, int]
 class AdaptiveGatedFusion1d(nn.Module):
     def __init__(self, channels):
         super().__init__()
-        # Changed from 1 to channels for per-channel gating
+        # Per-channel gate: produces α ∈ R^{B×C×L}.
         GateConv = nn.Conv1d(channels * 2, channels, kernel_size=1)
-        # Initialize weights to be very small to start with alpha around 0.5
-        nn.init.constant_(GateConv.weight, 0)
+        # See AdaptiveGatedFusion2d for rationale: small Gaussian init breaks
+        # the α=0.5 saddle point and lets the gate develop decisive routing.
+        nn.init.normal_(GateConv.weight, mean=0.0, std=0.2)
         nn.init.constant_(GateConv.bias, 0)
-        
+
         self.gate = nn.Sequential(
             GateConv,
             nn.Sigmoid()
@@ -182,12 +183,16 @@ class AWFNO1d(BaseModel):
 class AdaptiveGatedFusion2d(nn.Module):
     def __init__(self, channels):
         super().__init__()
-        # Changed from 1 to channels for per-channel gating
+        # Per-channel gate: produces α ∈ R^{B×C×H×W}, not a scalar map.
         GateConv = nn.Conv2d(channels * 2, channels, kernel_size=1)
-        # Initialize weights to be very small to start with alpha around 0.5
-        nn.init.constant_(GateConv.weight, 0)
+        # Symmetry-breaking init.  Zero init places sigmoid output at exactly
+        # 0.5 — a saddle point of the entropy landscape that gradient descent
+        # cannot escape (empirically: gate_H stays at log(2) for 50+ epochs
+        # with zero init).  Small Gaussian init breaks the symmetry so the
+        # gate can develop decisive routing while staying near 0.5 initially.
+        nn.init.normal_(GateConv.weight, mean=0.0, std=0.2)
         nn.init.constant_(GateConv.bias, 0)
-        
+
         self.gate = nn.Sequential(
             GateConv,
             nn.Sigmoid()

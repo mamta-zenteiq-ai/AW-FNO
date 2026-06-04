@@ -1,90 +1,273 @@
 # AW-FNO: Adaptive Wavelet-Fourier Neural Operator
 
-Breaking the frequency-localization trade-off in SciML by unifying global Spectral methods with local Multiresolution Analysis via learnable spatial gating.
-
-## Overview
-
-**AW-FNO** is a next-generation Neural Operator designed to overcome the fundamental limitations of the vanilla Fourier Neural Operator (FNO). By decomposing the latent function space into global spectral approximations and local multiresolution details, AW-FNO accurately captures both smooth macro-physics and localized singularities (like shocks or phase transitions) without the artifacts of global spectral bias.
+> **Paper:** *AW-FNO: An Adaptive approach for Fluid flow Super-resolution via Gated Wavelet-Fourier Learning*
+> Mamta Saini, Parikshit Mahajan, Gazania Marine Jyrwa, Diya Nagchaudhury, Sashikumaar Ganesan
+> ICCFD13, Milan, Italy, July 2026
 
 ---
 
-## Core Methodology: The Dual-Stream Framework
+## Overview
 
-The AW-FNO architecture employs a dual-stream approach to represent complex physical fields:
+**AW-FNO** fuses the **Fourier Neural Operator** (FNO) and the **Wavelet Neural Operator** (WNO)
+with a learned **Adaptive Gated Fusion Mechanism** (GFM).
 
-### 1. The Fourier Stream (Global Low-Rank Approximation)
-Acts as a low-pass filter to capture the "macro-physics." By truncating high-frequency modes $k_{\text{max}}$, it maintains a low-rank representation that ensures global structural consistency and computational efficiency.
-$$ (\mathcal{K}v)(x) = \mathcal{F}^{-1}(R_{\phi} \cdot \mathcal{F}v)(x) $$
+| Branch | Strength | Limitation (alone) |
+|---|---|---|
+| FNO (Fourier) | Global long-range correlations | Gibbs oscillations near sharp gradients |
+| WNO (Wavelet) | Localised multi-scale features | Misses global coherent structures |
+| **AW-FNO** | **Both — spatially decided** | — |
 
-### 2. The Wavelet Stream (Local Singularity Tracking)
-Utilizes Discrete/Stationary Wavelet Transforms (DWT/SWT). Unlike Fourier modes, wavelets are compactly supported in both space and frequency, allowing the model to resolve spatially varying frequencies and non-periodic boundary conditions without spectral leakage.
+The gate α(x,y) ∈ (0,1) learns *where* to trust each branch:
 
-### 3. The Latent Spatial Gate (Adaptive Delegation)
-A learnable spatial map $\alpha \in [0, 1]^{H \times W}$ computed from the local hidden state:
-$$ \alpha = \sigma(W_{\text{gate}} * h + b_{\text{gate}}) $$
-The final operator output is the gated sum:
-$$ \mathcal{K}_{AW}(h) = \alpha \odot \text{SpectralConv}(h) + (1 - \alpha) \odot \text{WaveletConv}(h) $$
+```
+V_fused = α ⊙ V_FNO  +  (1 − α) ⊙ V_WNO
+α = σ(Conv1×1([V_FNO, V_WNO]))     ← per-spatial-location, per-channel
+```
+
+- **α ≈ 1** (smooth, large-scale flow) → FNO dominates
+- **α ≈ 0** (vortex cores, shear layers) → WNO dominates
+
+---
+
+## Architecture
+
+```
+Input (B, C_in, H, W)
+  │  GridEmbedding2D  →  append (x,y) coords
+  │  Lifting MLP      →  (B, C_hid, H, W)
+  │
+  ├─ [AWFNOBlock2d] × L
+  │    │ SpectralConv2d  →  V_fno    # FFT → filter → IFFT
+  │    │ WaveConv2d      →  V_wno    # DWT → filter → IDWT
+  │    │ GFM: α = σ(Conv1×1([V_fno, V_wno]))
+  │    │ V_out = α⊙V_fno + (1−α)⊙V_wno + skip
+  │    └ LayerNorm + GELU
+  │
+  └  Projection MLP   →  (B, C_out, H, W)
+```
+
+---
+
+## Results (Navier-Stokes 2D, Re=1000, 64×64)
+
+| Model | Rel L2 ↓ | MSE ↓ | Params |
+|---|---|---|---|
+| FNO | — | — | — |
+| WNO | — | — | — |
+| AW-FNO (no gate) | — | — | — |
+| **AW-FNO (ours)** | **—** | **—** | — |
+
+*Run `make paper-ready` to populate this table with trained checkpoints.*
+
+---
+
+## Quick Start
+
+### 1. Install
+
+```bash
+git clone https://github.com/mamta-zenteiq-ai/AW-FNO.git
+cd AW-FNO
+
+# Conda (recommended)
+conda env create -f environment.yml
+conda activate aw-fno
+
+# Or pip
+pip install -r requirements.txt
+```
+
+### 2. Get data
+
+```bash
+# Download FNO benchmark datasets (~300 MB)
+python datasets/download_fno_data.py --dataset ns2d
+
+# Or if you already have the data:
+export DATA_PATH=/path/to/navier_stokes
+```
+
+### 3. Train a single model
+
+```bash
+# AW-FNO (proposed)
+make train-awfno DATA_PATH=/path/to/data
+
+# Baseline: FNO
+make train-fno DATA_PATH=/path/to/data
+
+# Baseline: WNO
+make train-wno DATA_PATH=/path/to/data
+```
+
+### 4. Full paper reproduction
+
+```bash
+# Trains all models, runs benchmark, generates all figures and tables
+DATA_PATH=/path/to/data make paper-ready
+```
 
 ---
 
 ## Repository Structure
 
-```text
+```
 AW-FNO/
-├── awfno/                  # Core library
-│   ├── models/             # AW-FNO Model definitions
-│   ├── layers/             # SpectralConv, WaveletConv, and Gating layers
-│   └── utils/              # Spectral/Wavelet transforms and data processing
-├── examples/               # Example scripts for various PDEs
-│   ├── burgers2d/          # 2D Burgers' equation
-│   ├── ginzburg_landau/    # Ginzburg-Landau equation (complex-valued)
-│   └── schrodinger/        # Schrödinger equation
-├── configs/                # Hyperparameter and model configurations (YAML/JSON)
-├── data/                   # Dataset storage (gitignored)
-├── docs/                   # Extended documentation and analysis
-├── tests/                  # Unit tests for layers and models
-├── scripts/                # Training, evaluation, and visualization scripts
-├── README.md               # Project overview
-├── requirements.txt        # Python dependencies
-└── setup.py                # Installation script
+├── awfno/                    # Core package
+│   ├── models/
+│   │   ├── awfno.py          # AW-FNO v1 (per-layer GFM) — paper primary
+│   │   ├── awfno_v2.py       # AW-FNO v2 (branch-parallel)
+│   │   ├── fno.py            # FNO baseline
+│   │   └── wno.py            # WNO baseline
+│   ├── layers/               # SpectralConv, WaveConv, embeddings
+│   └── utils/                # Normalisation, losses, seed
+│
+├── configs/
+│   ├── model/                # Per-model YAML configs
+│   ├── dataset/              # Dataset YAML configs
+│   └── experiment/           # Full experiment YAML configs
+│
+├── datasets/
+│   ├── ns2d.py               # NavierStokes2DDataset (PyTorch Dataset)
+│   ├── burgers1d.py          # Burgers1DDataset
+│   └── download_fno_data.py  # Automated dataset download
+│
+├── experiments/
+│   ├── train.py              # Unified training entry-point
+│   ├── evaluate.py           # Evaluation + metric reporting
+│   ├── benchmark.py          # Side-by-side model comparison
+│   └── ablation.py           # Ablation study driver
+│
+├── trainers/
+│   └── operator_trainer.py   # Training loop (AMP, grad-clip, CSV log)
+│
+├── utils/
+│   ├── metrics.py            # Rel-L2, MSE, MAE, spectral L2, MetricTracker
+│   ├── losses.py             # LpLoss, H1Loss, CombinedLoss
+│   ├── visualization.py      # Field plots, gate maps, PSD, convergence curves
+│   └── logging.py            # CSVLogger, get_logger
+│
+├── scripts/
+│   ├── reproduce_all.sh      # Full paper reproduction pipeline
+│   └── generate_paper_figures.py  # Figures + LaTeX tables
+│
+├── tests/                    # Pytest unit tests
+├── docs/                     # Research overview, dataset survey
+├── outputs/
+│   ├── figures/              # Generated paper figures (PDF/PNG)
+│   └── tables/               # LaTeX-ready .tex table files
+│
+├── Makefile                  # Shortcuts for all common tasks
+├── environment.yml           # Conda environment
+├── requirements.txt          # Pip requirements
+└── paper.tex                 # Paper source
 ```
 
 ---
 
-## Theoretical Foundation
+## Experiments
 
-Grounded in **Multiresolution Analysis (MRA)**, AW-FNO approximates any function $f \in L^2(\mathbb{R})$ via its decomposition:
-$$ f(x) = \underbrace{\sum_{k} c_k \phi(x-k)}_{\text{Fourier Stream}} + \underbrace{\sum_{j \ge 0} \sum_{k} d_{j,k} \psi_{j,k}(x)}_{\text{Wavelet Stream}} $$
-This provides a more complete representation of the underlying Sobolev space than FNO alone.
-
----
-
-## Evaluation Plan
-
-We evaluate AW-FNO on complex fields where phase-localization is paramount:
-- **Complex-Valued Ginzburg-Landau Equation**
-- **Schrödinger Equation**
-
-### Baselines
-- Vanilla FNO
-- WNO (Multiwavelets)
-- U-Net based PDE solvers
-
-### Metrics
-- **Relative $L_2$ Error**: Global accuracy.
-- **Maximum Error near Singularities**: Measuring the reduction in Gibbs oscillations.
-
----
-
-## Installation
+### Train all models + run benchmark
 
 ```bash
-git clone https://github.com/mamta-zenteiq-ai/AW-FNO.git
-cd AW-FNO
-pip install -r requirements.txt
+# Full run (uses DATA_PATH env var)
+bash scripts/reproduce_all.sh
+
+# Individual steps
+python experiments/train.py --config configs/experiment/train_awfno_ns.yaml \
+    --data_path /path/to/data --epochs 500
+
+python experiments/benchmark.py --data_path /path/to/data --save_figures
+```
+
+### Ablation study
+
+```bash
+# Run no-gate variant
+python experiments/train.py --config configs/experiment/ablation_no_gate.yaml \
+    --data_path /path/to/data
+
+# Collect all ablation results
+python experiments/ablation.py --data_path /path/to/data
+```
+
+### Evaluate a checkpoint
+
+```bash
+python experiments/evaluate.py \
+    --checkpoint results/awfno_ns/best.pt \
+    --config configs/experiment/train_awfno_ns.yaml \
+    --data_path /path/to/data \
+    --save_figures
 ```
 
 ---
 
-## 📝 License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## Configuration
+
+All experiments are controlled by YAML files in `configs/`. Override any field via CLI:
+
+```bash
+python experiments/train.py \
+    --config configs/experiment/train_awfno_ns.yaml \
+    --epochs 200 \
+    --lr 5e-4 \
+    --output_dir results/awfno_ns_lr5e4
+```
+
+Key experiment config fields:
+
+| Field | Default | Description |
+|---|---|---|
+| `epochs` | 500 | Training epochs |
+| `learning_rate` | 1e-3 | Adam LR |
+| `scheduler_step_size` | 100 | StepLR decay step |
+| `scheduler_gamma` | 0.5 | StepLR decay factor |
+| `amp` | false | Automatic mixed precision |
+| `grad_clip` | 1.0 | Gradient clipping max-norm |
+| `seed` | 42 | Global random seed |
+
+---
+
+## Tests
+
+```bash
+make test                    # Run all unit tests
+python -m pytest tests/ -v   # Verbose
+```
+
+Tests cover: model forward passes, gradient flow, loss functions, metrics, dataset loading,
+normalizer roundtrips, and the no-gate ablation patch.
+
+---
+
+## Citation
+
+```bibtex
+@inproceedings{saini2026awfno,
+  title     = {{AW-FNO}: An Adaptive approach for Fluid flow Super-resolution
+               via Gated Wavelet-Fourier Learning},
+  author    = {Saini, Mamta and Mahajan, Parikshit and Jyrwa, Gazania Marine
+               and Nagchaudhury, Diya and Ganesan, Sashikumaar},
+  booktitle = {Proceedings of the 13th International Conference on
+               Computational Fluid Dynamics (ICCFD13)},
+  year      = {2026},
+  address   = {Milan, Italy},
+}
+```
+
+---
+
+## License
+
+MIT License — see [LICENSE](LICENSE) for details.
+
+---
+
+## Acknowledgements
+
+This work uses:
+- [neuraloperator](https://github.com/neuraloperator/neuraloperator) — spectral convolution layers
+- [pytorch-wavelets](https://github.com/fbcotter/pytorch_wavelets) — DWT implementation
+- [tensorly](https://github.com/tensorly/tensorly) / [tltorch](https://github.com/tensorly/torch) — tensor decomposition
+- FNO dataset from [Li et al. (2021)](https://arxiv.org/abs/2010.08895)

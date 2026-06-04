@@ -1,0 +1,19 @@
+{
+  "model_name": "awfno_v2_se",
+  "fusion_type": "se",
+  "se_reduction": 4,
+  "downsample_factor": 4,
+  "lr_resolution": 256,
+  "hr_resolution": 1024,
+  "n_params": 2667219,
+  "rel_l2_per_field": {
+    "Vx": 0.03327067941427231,
+    "density": 0.053162410855293274,
+    "pressure": 0.03835688903927803
+  },
+  "rel_l2_mean": 0.04159665976961454,
+  "epochs_trained": 500,
+  "batch_size": 16,
+  "learning_rate": 0.001,
+  "architecture": "AWFNOv2Enhanced"
+}

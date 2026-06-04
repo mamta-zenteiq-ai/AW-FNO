@@ -1,0 +1,14 @@
+{
+  "downsample_factor": 4,
+  "lr_resolution": 256,
+  "hr_resolution": 1024,
+  "n_params": 2664067,
+  "rel_l2_per_field": {
+    "0": 0.047887109220027924,
+    "1": 0.14298711717128754,
+    "2": 0.02500458061695099
+  },
+  "epochs_trained": 500,
+  "batch_size": 16,
+  "learning_rate": 0.001
+}

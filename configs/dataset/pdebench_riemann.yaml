@@ -1,0 +1,26 @@
+# PDEBench 1D compressible Navier-Stokes, random shock-tube (Riemann) ICs.
+#
+# File: 1D_CFD_Shock_Eta1.e-8_Zeta1.e-8_trans_Train.hdf5 (PDEBench,
+#       DOI 10.18419/darus-2986). Near-inviscid (Eta=Zeta=1e-8), transmissive
+#       BCs. Bulk format: density/Vx/pressure each (N, T, X=1024); ~10k random
+#       two-state shock-tube ICs. Each evolved field has a shock + contact
+#       discontinuity + rarefaction fan -> the multi-wave gate-routing target.
+#
+# Same HDF5 key layout (density/Vx/pressure, X=1024) as the small on-disk Sod
+# files used by examples/example_awfno_pdebench_sod.py; this is the
+# paper-quality multi-sample upgrade of that shock-tube experiment.
+#
+# Task: predict the developed field u(x, T) from the IC u(x, 0).
+name: pdebench_riemann
+
+data_path: /media/HDD/mamta_backup/datasets/PDEBench/cfd
+file_glob: "1D_CFD_Shock*Train.hdf5"
+
+variable: density            # cleanest shock+contact structure
+task: initial_to_final
+n_train: 9000
+n_test: 1000
+train_frac: 0.9
+
+batch_size: 32
+seed: 42

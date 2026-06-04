@@ -1,0 +1,20 @@
+# PDEBench 1D Burgers Nu=0.01 — the "smoother shock" point of the viscosity
+# sweep (vs the sharp Nu=0.001 already trained). PDEBench has no Nu=1e-4, so the
+# sweep runs toward higher viscosity instead: routing strength rho((1-a),|du/dx|)
+# is expected to DECREASE as the shock broadens (Nu 0.001 -> 0.01).
+#
+# File: 1D_Burgers_Sols_Nu0.01.hdf5 (single 'tensor' key, (N, T, X=1024)).
+name: pdebench_burgers
+
+data_path: /media/HDD/mamta_backup/datasets/PDEBench/burgers
+
+task: initial_to_final
+n_train: 9000
+n_test: 1000
+train_frac: 0.9
+viscosity_tag: "0.01"
+resolution: 1024
+
+batch_size: 64
+seed: 42
+normalisation: unitgaussian
