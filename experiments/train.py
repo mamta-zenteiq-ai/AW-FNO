@@ -241,6 +241,17 @@ def build_from_config(cfg: dict, ablation_fixed_gate: bool = False) -> torch.nn.
         hidden_layers = int(rich_cfg.get("hidden_layers", 2))
         _patch_rich_gate(model, kernel_size=kernel_size, hidden_layers=hidden_layers)
 
+    # Spatial gate: a single-channel α(x,y) shared across all feature channels.
+    # The per-channel rich gate can satisfy the entropy penalty by committing
+    # along the CHANNEL axis (a near-static FNO/WNO split, spatially flat); a
+    # single output channel removes that escape, so the only way to be decisive
+    # is to vary α spatially — i.e. genuine spatial routing.
+    spatial_cfg = cfg.get("spatial_gate", None)
+    if spatial_cfg and name == "awfno":
+        kernel_size = int(spatial_cfg.get("kernel_size", 5))
+        hidden_layers = int(spatial_cfg.get("hidden_layers", 2))
+        _patch_spatial_gate(model, kernel_size=kernel_size, hidden_layers=hidden_layers)
+
     return model
 
 
@@ -347,6 +358,76 @@ def _patch_rich_gate(
     print(
         f"  [Mitigation C] Replaced 1×1 gate with kernel={kernel_size}, "
         f"hidden_layers={hidden_layers} Conv gate in {n_patched} blocks."
+    )
+
+
+def _patch_spatial_gate(
+    model: torch.nn.Module,
+    kernel_size: int = 5,
+    hidden_layers: int = 2,
+) -> None:
+    """
+    Replace the gate with a multi-layer convolutional gate whose FINAL layer
+    outputs a SINGLE channel, i.e. α ∈ R^{B×1×H×W} broadcast over all feature
+    channels in the fusion (α·v_fno + (1−α)·v_wno).
+
+    Motivation: the per-channel rich gate satisfies the entropy penalty by
+    committing along the channel axis (a near-static FNO/WNO subspace split
+    that is spatially flat, so ρ((1−α),|∇ω|)≈0 on homogeneous turbulence).
+    Collapsing the gate to one channel removes that degree of freedom — the
+    only way for the gate to become decisive is to vary α(x,y) spatially, which
+    forces genuine spatial routing. This is the channel-shared spatial gate of
+    the original architecture (α ∈ R^{B×H×W×1}), but with the rich gate's
+    spatial receptive field.
+
+    Architecture (2D; 1D analogous):
+        Conv_k(2C → C) → GELU → Conv_k(C → 1) → Sigmoid          (hidden_layers=2)
+        Conv_k(2C → 1) → Sigmoid                                  (hidden_layers=1)
+    """
+    import torch.nn as nn
+
+    n_patched = 0
+    for block in model.blocks:
+        if not hasattr(block, "gfm"):
+            continue
+        gfm = block.gfm
+        existing_gate = getattr(gfm, "gate", None)
+        if existing_gate is None:
+            continue
+
+        first = existing_gate[0]
+        if isinstance(first, nn.Conv1d):
+            ConvCls = nn.Conv1d
+        elif isinstance(first, nn.Conv2d):
+            ConvCls = nn.Conv2d
+        else:
+            continue
+
+        c_in = first.in_channels        # = 2 * channels
+        c_mid = first.out_channels      # = channels
+        pad = kernel_size // 2
+
+        if hidden_layers == 1:
+            new_conv = ConvCls(c_in, 1, kernel_size=kernel_size, padding=pad)
+            nn.init.normal_(new_conv.weight, mean=0.0, std=0.2)
+            nn.init.constant_(new_conv.bias, 0)
+            new_gate = nn.Sequential(new_conv, nn.Sigmoid())
+        else:
+            l1 = ConvCls(c_in, c_mid, kernel_size=kernel_size, padding=pad)
+            l2 = ConvCls(c_mid, 1, kernel_size=kernel_size, padding=pad)
+            nn.init.normal_(l1.weight, mean=0.0, std=0.2)
+            nn.init.constant_(l1.bias, 0)
+            nn.init.normal_(l2.weight, mean=0.0, std=0.2)
+            nn.init.constant_(l2.bias, 0)
+            new_gate = nn.Sequential(l1, nn.GELU(), l2, nn.Sigmoid())
+
+        gfm.gate = new_gate
+        n_patched += 1
+
+    print(
+        f"  [Spatial gate] Replaced gate with single-channel kernel={kernel_size}, "
+        f"hidden_layers={hidden_layers} Conv gate in {n_patched} blocks "
+        f"(α shared across channels → forces spatial routing)."
     )
 
 

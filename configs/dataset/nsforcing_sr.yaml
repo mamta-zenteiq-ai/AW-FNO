@@ -7,7 +7,10 @@
 # This is the dataset used to justify the paper's "super-resolution" framing.
 name: nsforcing_sr
 
-data_path: data/nsforcing
+# Absolute path to the on-disk tensors (the old relative `data/nsforcing` did
+# not exist; runs had to pass --data_path. Fixed here so all NS-forcing SR
+# runs — including the spatial-gate queue — work without the override.)
+data_path: /media/HDD/mamta_backup/datasets/fno/navier_stokes
 train_file: nsforcing_train_128.pt
 test_file: nsforcing_test_128.pt
 

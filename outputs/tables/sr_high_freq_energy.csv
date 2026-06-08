@@ -1,7 +1,9 @@
 field,high_freq_energy_fraction
 Ground truth,1.177402e-08
 Bicubic,7.271068e-06
-FNO,1.629871e-06
-WNO,1.131556e-06
-AW-FNO (fixed α),2.800145e-06
-AW-FNO (1×1 gate),1.941129e-06
+FNO,1.818805e-06
+WNO,1.135403e-06
+AW-FNO (fixed α),2.814034e-06
+AW-FNO (1×1 gate),5.777286e-07
+FNO-fat,1.999638e-06
+AW-FNO (rich gate),1.816136e-07

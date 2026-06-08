@@ -1,0 +1,7 @@
+model,params,ms_per_sample
+FNO,914401,0.602
+FNO-fat (c=128),14618497,2.367
+WNO,81580545,1.834
+AW-FNO (fixed α),89314081,2.56
+AW-FNO (1×1 gate),89322401,2.743
+AW-FNO (rich gate),89621537,5.078
