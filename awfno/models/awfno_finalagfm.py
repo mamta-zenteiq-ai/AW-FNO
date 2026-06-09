@@ -18,10 +18,12 @@ Number = Union[float, int]
 #
 #  i)  Lifting: (x, a(x)) ──P──> v_0  ∈ R^{B×C×H×W}
 #
-#  ii) Two INDEPENDENT T-layer branches, both fed v_0:
+#  ii) Two INDEPENDENT T-layer branches, both fed v_0, run in PARALLEL via
+#      torch.jit.fork at the branch level (each branch is one fork):
 #
-#        FNO branch:  v_0 → FNOBlock → v_1^F → ... → FNOBlock → v_FNO
-#        WNO branch:  v_0 → WNOBlock → v_1^W → ... → WNOBlock → v_WNO
+#        FNO branch:  v_0 → FNOBlock → v_1^F → ... → FNOBlock → v_FNO   ──┐
+#                                                                          ├─ parallel
+#        WNO branch:  v_0 → WNOBlock → v_1^W → ... → WNOBlock → v_WNO   ──┘
 #
 #      Each FNOBlock:  v_{t+1} = σ( LayerNorm( K_F(v_t) + W·v_t ) )
 #      Each WNOBlock:  v_{t+1} = σ( LayerNorm( K_W(v_t) + W·v_t ) )
@@ -69,10 +71,7 @@ class FNOBlock1d(nn.Module):
         self.dropout = nn.Dropout(dropout) if dropout > 0.0 else nn.Identity()
 
     def forward(self, x):
-        # fno_conv and skip both read x independently — run them in parallel.
-        future_conv = torch.jit.fork(self.fno_conv, x)
-        future_skip = torch.jit.fork(self.skip,     x)
-        out = torch.jit.wait(future_conv) + torch.jit.wait(future_skip)
+        out = self.fno_conv(x) + self.skip(x)
         out = out.permute(0, 2, 1)      # (B,C,L) → (B,L,C) for LayerNorm
         out = self.norm(out)
         out = out.permute(0, 2, 1)      # (B,L,C) → (B,C,L)
@@ -99,10 +98,7 @@ class WNOBlock1d(nn.Module):
         self.dropout = nn.Dropout(dropout) if dropout > 0.0 else nn.Identity()
 
     def forward(self, x):
-        # wno_conv and skip both read x independently — run them in parallel.
-        future_conv = torch.jit.fork(self.wno_conv, x)
-        future_skip = torch.jit.fork(self.skip,     x)
-        out = torch.jit.wait(future_conv) + torch.jit.wait(future_skip)
+        out = self.wno_conv(x) + self.skip(x)
         out = out.permute(0, 2, 1)
         out = self.norm(out)
         out = out.permute(0, 2, 1)
@@ -127,10 +123,7 @@ class FNOBlock2d(nn.Module):
         self.dropout = nn.Dropout(dropout) if dropout > 0.0 else nn.Identity()
 
     def forward(self, x):
-        # fno_conv and skip both read x independently — run them in parallel.
-        future_conv = torch.jit.fork(self.fno_conv, x)
-        future_skip = torch.jit.fork(self.skip,     x)
-        out = torch.jit.wait(future_conv) + torch.jit.wait(future_skip)
+        out = self.fno_conv(x) + self.skip(x)
         out = out.permute(0, 2, 3, 1)   # (B,C,H,W) → (B,H,W,C) for LayerNorm
         out = self.norm(out)
         out = out.permute(0, 3, 1, 2)   # (B,H,W,C) → (B,C,H,W)
@@ -157,10 +150,7 @@ class WNOBlock2d(nn.Module):
         self.dropout = nn.Dropout(dropout) if dropout > 0.0 else nn.Identity()
 
     def forward(self, x):
-        # wno_conv and skip both read x independently — run them in parallel.
-        future_conv = torch.jit.fork(self.wno_conv, x)
-        future_skip = torch.jit.fork(self.skip,     x)
-        out = torch.jit.wait(future_conv) + torch.jit.wait(future_skip)
+        out = self.wno_conv(x) + self.skip(x)
         out = out.permute(0, 2, 3, 1)
         out = self.norm(out)
         out = out.permute(0, 3, 1, 2)
@@ -301,6 +291,20 @@ class AWFNO1dFinalAGFM(BaseModel):
             dropout=dropout,
         )
 
+    def _fno_branch(self, x):
+        # Full T-block FNO stack: v_0 → v_1^F → ... → v_FNO
+        v = x
+        for block in self.fno_blocks:
+            v = block(v)
+        return v
+
+    def _wno_branch(self, x):
+        # Full T-block WNO stack: v_0 → v_1^W → ... → v_WNO
+        v = x
+        for block in self.wno_blocks:
+            v = block(v)
+        return v
+
     def forward(self, x):
         if self.pos_embed is not None:
             x = self.pos_embed(x)
@@ -308,15 +312,11 @@ class AWFNO1dFinalAGFM(BaseModel):
         if self.padding > 0:
             x = F.pad(x, [0, self.padding])
 
-        # FNO branch: v_0 → v_1^F → ... → v_FNO  (independent of WNO)
-        v_fno = x
-        for block in self.fno_blocks:
-            v_fno = block(v_fno)
-
-        # WNO branch: v_0 → v_1^W → ... → v_WNO  (independent of FNO)
-        v_wno = x
-        for block in self.wno_blocks:
-            v_wno = block(v_wno)
+        # Parallel T-blocks: fork the two full branches against v_0.
+        future_fno = torch.jit.fork(self._fno_branch, x)
+        future_wno = torch.jit.fork(self._wno_branch, x)
+        v_fno = torch.jit.wait(future_fno)
+        v_wno = torch.jit.wait(future_wno)
 
         if self.padding > 0:
             v_fno = v_fno[..., :-self.padding]
@@ -413,6 +413,20 @@ class AWFNO2dFinalAGFM(BaseModel):
             dropout=dropout,
         )
 
+    def _fno_branch(self, x):
+        # Full T-block FNO stack: v_0 → v_1^F → ... → v_FNO
+        v = x
+        for block in self.fno_blocks:
+            v = block(v)
+        return v
+
+    def _wno_branch(self, x):
+        # Full T-block WNO stack: v_0 → v_1^W → ... → v_WNO
+        v = x
+        for block in self.wno_blocks:
+            v = block(v)
+        return v
+
     def forward(self, x):
         if self.pos_embed is not None:
             x = self.pos_embed(x, batched=True)
@@ -420,15 +434,11 @@ class AWFNO2dFinalAGFM(BaseModel):
         if self.padding > 0:
             x = F.pad(x, [0, self.padding, 0, self.padding])
 
-        # FNO branch: v_0 → v_1^F → ... → v_FNO  (independent of WNO)
-        v_fno = x
-        for block in self.fno_blocks:
-            v_fno = block(v_fno)
-
-        # WNO branch: v_0 → v_1^W → ... → v_WNO  (independent of FNO)
-        v_wno = x
-        for block in self.wno_blocks:
-            v_wno = block(v_wno)
+        # Parallel T-blocks: fork the two full branches against v_0.
+        future_fno = torch.jit.fork(self._fno_branch, x)
+        future_wno = torch.jit.fork(self._wno_branch, x)
+        v_fno = torch.jit.wait(future_fno)
+        v_wno = torch.jit.wait(future_wno)
 
         if self.padding > 0:
             v_fno = v_fno[..., :-self.padding, :-self.padding]

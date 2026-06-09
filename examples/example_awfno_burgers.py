@@ -29,7 +29,7 @@ def train_burgers():
     learning_rate = 1e-3
     print_every = 100
 
-    data_path = '/media/HDD/mamta_backup/datasets/fno/burgers'
+    data_path = '/home/parikshit/AW-FNO/awfno/data/burger'
     results_dir = os.path.join(PROJECT_ROOT, 'results', 'awfno_burgers')
     os.makedirs(results_dir, exist_ok=True)
 
