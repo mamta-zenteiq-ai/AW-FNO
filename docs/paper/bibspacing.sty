@@ -1,0 +1,18 @@
+% Minimal local stub for the (non-CTAN-in-this-TeXLive) bibspacing package.
+% Provides the \bibspacing length and applies it as the inter-item spacing in
+% the bibliography, which is all paper.tex uses it for. Replace with the real
+% package if exact spacing matters.
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{bibspacing}[2026/06/03 local stub: bibliography item spacing]
+
+\newdimen\bibspacing
+\bibspacing=0pt
+
+\let\bibspacing@oldthebibliography\thebibliography
+\renewcommand{\thebibliography}[1]{%
+  \bibspacing@oldthebibliography{#1}%
+  \setlength{\itemsep}{\bibspacing}%
+  \setlength{\parsep}{0pt}%
+}
+
+\endinput
