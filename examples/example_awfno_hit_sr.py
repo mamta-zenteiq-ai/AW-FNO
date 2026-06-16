@@ -291,40 +291,48 @@ def train_awfno_hit_sr():
     fig.savefig(os.path.join(results_dir, 'loss_curves.png'), bbox_inches='tight', dpi=200)
     plt.close(fig)
 
-    # 2) 4-panel: GT | Bicubic-upsampled LR | AW-FNO Prediction | |Error|
-    # x_test_in_phys is the bicubic-upsampled LR in physical scale.
-    # PSNR / SSIM are computed per sample (prediction vs GT) in physical scale.
+    # 2) 5-panel: GT | Raw LR (32×32) | Bicubic-upsampled LR | AW-FNO Prediction | |Error|
+    # - Raw LR shown with `interpolation='nearest'` so the 32×32 pixelation is visible
+    #   (no implicit smoothing). This is what makes the super-resolution visually evident.
+    # - x_test_in_phys is the bicubic-upsampled LR (physical scale).
+    # - PSNR / SSIM are computed per sample (prediction vs GT) in physical scale.
     n_show     = 4
     idx        = np.linspace(0, pred_in.shape[0] - 1, n_show, dtype=int)
     col_titles = [
         f'Ground Truth\n(HR {hr_size}×{hr_size})',
+        f'Low-Resolution Input\n(LR {lr_train}×{lr_train})',
         f'Bicubic Pre-upsampled\n(LR {lr_train}×{lr_train} → {hr_size}×{hr_size})',
         f'AW-FNO Prediction\n({hr_size}×{hr_size})',
         f'Absolute Error\n({hr_size}×{hr_size})',
     ]
-    cmaps      = ['nipy_spectral', 'nipy_spectral', 'nipy_spectral', 'jet']
-    fig, axes = plt.subplots(n_show, 4, figsize=(17, 4 * n_show))
-    fig.suptitle(f'AW-FNO HIT SR ({lr_train}→{hr_size}) — GT | Bicubic LR | Prediction | |Error|',
+    cmaps  = ['nipy_spectral', 'nipy_spectral', 'nipy_spectral', 'nipy_spectral', 'jet']
+    interp = ['Gaussian',      'nearest',       'Gaussian',      'Gaussian',      'Gaussian']
+    fig, axes = plt.subplots(n_show, 5, figsize=(21, 4 * n_show))
+    fig.suptitle(f'AW-FNO HIT SR ({lr_train}→{hr_size}) — GT | LR | Bicubic LR | Prediction | |Error|',
                  fontsize=15, fontweight='bold')
 
     sample_psnr, sample_ssim = [], []
     print("\nPer-sample PSNR / SSIM (AW-FNO prediction vs HR ground truth):")
     for r, i in enumerate(idx):
-        gt  = y_all          [i].cpu().numpy().squeeze()
-        bc  = x_test_in_phys [i].cpu().numpy().squeeze()
-        pr  = pred_in        [i].cpu().numpy().squeeze()
-        err = np.abs(gt - pr)
+        gt    = y_all          [i].cpu().numpy().squeeze()
+        bc    = x_test_in_phys [i].cpu().numpy().squeeze()
+        pr    = pred_in        [i].cpu().numpy().squeeze()
+        err   = np.abs(gt - pr)
+        # Raw LR (32x32) in physical scale: avg-pool the HR GT with the same kernel
+        # the training pipeline uses (hr_size // lr_train = 4 for 32→128).
+        lr_gt = F.avg_pool2d(y_all[i:i+1], kernel_size=hr_size // lr_train).cpu().numpy().squeeze()
 
-        ps  = psnr(gt, pr)
-        ss  = ssim(gt, pr)
+        ps = psnr(gt, pr)
+        ss = ssim(gt, pr)
         sample_psnr.append(ps)
         sample_ssim.append(ss)
         print(f"  Sample {i:3d}: PSNR = {ps:6.2f} dB | SSIM = {ss:.4f}")
 
-        for c, (field, cmap, ctitle) in enumerate(zip([gt, bc, pr, err], cmaps, col_titles)):
+        fields = [gt, lr_gt, bc, pr, err]
+        for c, (field, cmap, ctitle, ip) in enumerate(zip(fields, cmaps, col_titles, interp)):
             ax = axes[r, c]
             im = ax.imshow(field, origin='lower', extent=[0, 1, 0, 1],
-                           interpolation='Gaussian', cmap=cmap)
+                           interpolation=ip, cmap=cmap)
             plt.colorbar(im, ax=ax, fraction=0.045)
             if r == 0:
                 ax.set_title(ctitle, fontsize=12, fontweight='bold')
@@ -344,8 +352,8 @@ def train_awfno_hit_sr():
              ha='center', fontsize=13, fontweight='bold')
 
     fig.tight_layout(rect=[0, 0.02, 1, 0.96])
-    fig.savefig(os.path.join(results_dir, 'gt_bicubic_pred_error.pdf'), bbox_inches='tight')
-    fig.savefig(os.path.join(results_dir, 'gt_bicubic_pred_error.png'), bbox_inches='tight', dpi=200)
+    fig.savefig(os.path.join(results_dir, 'gt_lr_bicubic_pred_error.pdf'), bbox_inches='tight')
+    fig.savefig(os.path.join(results_dir, 'gt_lr_bicubic_pred_error.png'), bbox_inches='tight', dpi=200)
     plt.close(fig)
 
     # 3) Save histories + final preds for reuse

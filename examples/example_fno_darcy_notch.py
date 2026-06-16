@@ -227,7 +227,7 @@ def train_fno_darcy_notch():
         n_modes=(12, 12),
         in_channels=1,
         out_channels=1,
-        hidden_channels=64,
+        hidden_channels=192,
         n_layers=4,
         positional_embedding="grid",
     ).to(device)
@@ -372,19 +372,19 @@ def train_fno_darcy_notch():
 
     axes[0].semilogy(epochs_ax, train_h1_hist,  label='Train H1 (Sobolev)', color='purple')
     axes[0].semilogy(epochs_ax, test_h1_hist,   label='Test H1 (Sobolev)',  color='orchid', linestyle='--')
-    axes[0].set_xlabel('Epoch'); axes[0].set_ylabel('H1 Loss (log scale)')
+    axes[0].set_xlabel('Epoch'); axes[0].set_ylabel('H1 Loss')
     axes[0].set_title('FNO Darcy Notch — Sobolev H1 Loss')
     axes[0].legend(); axes[0].grid(True, alpha=0.3)
 
     axes[1].semilogy(epochs_ax, train_mse_hist, label='Train MSE', color='steelblue')
     axes[1].semilogy(epochs_ax, test_mse_hist,  label='Test MSE',  color='steelblue', linestyle='--')
-    axes[1].set_xlabel('Epoch'); axes[1].set_ylabel('MSE (log scale)')
+    axes[1].set_xlabel('Epoch'); axes[1].set_ylabel('MSE')
     axes[1].set_title('FNO Darcy Notch — MSE')
     axes[1].legend(); axes[1].grid(True, alpha=0.3)
 
     axes[2].semilogy(epochs_ax, train_rel_hist, label='Train Rel-L2', color='tomato')
     axes[2].semilogy(epochs_ax, test_rel_hist,  label='Test Rel-L2',  color='tomato', linestyle='--')
-    axes[2].set_xlabel('Epoch'); axes[2].set_ylabel('Relative L2 (log scale)')
+    axes[2].set_xlabel('Epoch'); axes[2].set_ylabel('Relative L2')
     axes[2].set_title('FNO Darcy Notch — Relative L2')
     axes[2].legend(); axes[2].grid(True, alpha=0.3)
 

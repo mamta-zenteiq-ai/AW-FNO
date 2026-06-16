@@ -233,7 +233,7 @@ def train_burgers_discontinuity():
         n_modes=(64, 4),            # ↑ from (16,4); n_modes_y capped at T_IN//2=5
         in_channels=1,
         out_channels=1,
-        hidden_channels=64,         # ↑ from 32; main driver of parameter count
+        hidden_channels=192,         # ↑ from 32; main driver of parameter count
         n_layers=4,
         positional_embedding="grid",
         use_channel_mlp=True,
