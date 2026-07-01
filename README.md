@@ -1,7 +1,7 @@
 # AW-FNO: Adaptive Wavelet-Fourier Neural Operator
 
 > **Paper:** *AW-FNO: An Adaptive approach for Fluid flow Super-resolution via Gated Wavelet-Fourier Learning*
-> Mamta Saini, Parikshit Mahajan, Gazania Marine Jyrwa, Diya Nagchaudhury, Sashikumaar Ganesan
+> Mamta Saini, Parikshit Mahajan, Gazania Marine Jyrwa, Diya Nagchaudhury
 > ICCFD13, Milan, Italy, July 2026
 
 ---
