@@ -28,7 +28,7 @@ A practical property of AW-FNO is that disabling either branch through an archit
 
 Applies FFT, truncates to $k_{\max}$ low-frequency modes, applies learnable complex weights $R_\phi$, then applies inverse FFT:
 
-$$v_{t+1}^{\text{FNO}} = \sigma\!\left(W_t(v_t)(x) + \mathcal{F}^{-1}\!\left(R_\phi \cdot \mathcal{F}(v_t)\right)(x) + b_t(x)\right)$$
+$$v_{t+1}^{\text{FNO}} = \sigma\left(W_t(v_t)(x) + \mathcal{F}^{-1}\left(R_\phi \cdot \mathcal{F}(v_t)\right)(x) + b_t(x)\right)$$
 
 Captures smooth, long-range, globally coherent features efficiently via $O(n \log n)$ FFT.
 
@@ -36,7 +36,7 @@ Captures smooth, long-range, globally coherent features efficiently via $O(n \lo
 
 Applies DWT (Daubechies wavelets), applies learnable weights in wavelet space, then applies inverse DWT:
 
-$$v_{t+1}^{\text{WNO}} = \sigma\!\left(W_t(v_t)(x) + \mathcal{W}^{-1}\!\left(R_\phi \cdot \mathcal{W}(v_t)\right)(x) + b_t(x)\right)$$
+$$v_{t+1}^{\text{WNO}} = \sigma\left(W_t(v_t)(x) + \mathcal{W}^{-1}\left(R_\phi \cdot \mathcal{W}(v_t)\right)(x) + b_t(x)\right)$$
 
 Captures sharp gradients, local discontinuities, and multi-scale structures simultaneously localized in space and frequency.
 
@@ -44,7 +44,7 @@ Captures sharp gradients, local discontinuities, and multi-scale structures simu
 
 The two branch outputs $v_{\text{FNO}}, v_{\text{WNO}} \in \mathbb{R}^{B \times H \times W \times C}$ are fused via a learned spatial gate:
 
-$$\alpha = \sigma\!\left(\text{Conv}_{n \times n}([v_{\text{FNO}},\, v_{\text{WNO}}])\right)$$
+$$\alpha = \sigma\left(\text{Conv}_{n \times n}([v_{\text{FNO}}, v_{\text{WNO}}])\right)$$
 
 $$v_{\text{fused}} = \alpha \odot v_{\text{FNO}} + (1 - \alpha) \odot v_{\text{WNO}}$$
 
@@ -52,7 +52,7 @@ Where $\alpha \approx 1$ in smooth regions (FNO dominates) and $\alpha \approx 0
 
 ---
 
-## Theoretical Foundation
+<!-- ## Theoretical Foundation
 
 Grounded in **Multiresolution Analysis (MRA)**, any $f \in L^2(\mathbb{R})$ can be decomposed as:
 
@@ -60,7 +60,7 @@ $$f(x) = \sum_{k} \langle f, \phi_{j_0,k}\rangle\, \phi_{j_0,k}(x) + \sum_{j \ge
 
 where $\phi$ (scaling function) captures smooth approximations and $\psi$ (mother wavelet) captures localized detail at each scale $j$. The FNO branch approximates the first sum; the WNO branch approximates the second.
 
----
+--- -->
 
 ## Results
 
@@ -98,7 +98,7 @@ Maps $32 \times 32$ low-resolution input to $128 \times 128$ high-resolution fie
 AW-FNO/
 ├── awfno/                  # Core library
 │   ├── models/             # AW-FNO, FNO, WNO model definitions
-│   ├── layers/             # SpectralConv, WaveletConv, gating layers
+│   ├── layers/             # SpectralConv, WaveletConv
 │   ├── data/               # Dataset loaders (Burgers, Darcy, NS, HIT)
 │   └── utils/              # Losses, normalization, scaling utilities
 ├── examples/               # Training scripts for each benchmark
