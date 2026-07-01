@@ -98,10 +98,9 @@ Maps $32 \times 32$ low-resolution input to $128 \times 128$ high-resolution fie
 AW-FNO/
 ├── awfno/                  # Core library
 │   ├── models/             # AW-FNO, FNO, WNO model definitions
-│   ├── layers/             # SpectralConv, WaveletConv
-│   ├── data/               # Dataset loaders (Burgers, Darcy, NS, HIT)
+│   ├── layers/             # SpectralConv, WaveletConv, and supporting layers
 │   └── utils/              # Losses, normalization, scaling utilities
-├── examples/               # Training scripts for each benchmark
+├── examples/               # Per-benchmark training scripts (awfno/fno/wno × benchmark)
 ├── results/                # Training logs and model checkpoints
 ├── requirements.txt        # Python dependencies
 ├── setup.py                # Installation script
