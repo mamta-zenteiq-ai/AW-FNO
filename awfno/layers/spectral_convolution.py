@@ -1,18 +1,78 @@
 from typing import List, Optional, Tuple, Union
+# typing is built-in python standard library, no need to install. For Python 3.9+,
+# don't need to import List, Tuple, etc. from typing, can just use list, tuple, etc. directly.
+# List: list of items
+# Optional: a type that can be either the specified type or None
+# Tuple: a fixed-length tuple (e.g., Tuple[int, int] is a tuple of two integers). "tuple" is immutable.
+# Union: a type that can be one of several specified types (e.g., Union[int, float] can be either an int or a float)
 
 from ..utils.scaling import validate_scaling_factor
+# . means from the current package, .. means from the parent package( go up one level in the package hierarchy).
+# Here, scaling.py is in the "utils" package, which is a sibling of the "layers" package where this file is located. 
+# We import the validate_scaling_factor function from scaling.py to use it in this file.
+# validate_scaling_factor is a function that checks if the provided resolution scaling factor is valid and 
+# converts it to a standardized format (e.g., list of lists) for use in the SpectralConv layer.
+# simple e.g.: # User passes a single number
+               # validate_scaling_factor(0.5, n_dim=2)
+               # returns [0.5, 0.5]  ← one value per dimension
 
-import torch
-from torch import nn
+import torch # Pytorch is a popular open-source deep learning framework.
+from torch import nn # "nn" is a submodule in PyTorch that provides classes and functions for building neural networks.
 
-import tensorly as tl
+import tensorly as tl # "tensorly" is a Python library for (math of tensors) tensor learning and decomposition. 
+# It provides tools for working with multi-dimensional arrays (tensors) and 
+# supports various tensor decompositions (e.g., CP, Tucker, Tensor Train).
+# CP decomposition factorizes a tensor into a sum of rank-1 tensors.
+# Tucker decomposition factorizes a tensor into a core tensor multiplied by factor matrices along each dimension.
+# Tensor Train (TT) decomposition factorizes a tensor into a sequence of 3D tensors (cores) connected in a train-like structure.
+
 from tensorly.plugins import use_opt_einsum
+# tensorly is module, which we installed and imported as tl. plugins is a submodule of tensorly that provides 
+# a way to use optimized einsum implementations. einsum is a powerful function for performing tensor multiplications
+#  and contractions using Einstein summation notation. 
+# use_opt_einsum is a function that allows us to specify which einsum implementation to use.
+
 from tltorch.factorized_tensors.core import FactorizedTensor
+# tltorch .i.e. tensorly-torch is an extension of tensorly that provides support for PyTorch tensors. It lets us 
+# to store and manipulate factorized(compressed) tensors (e.g., CP, Tucker, TT) in PyTorch instead of full dense tensors.
+# These factorized tensors can be weights in neural networks.
+# facorized_tensors is a submodule of tltorch that provides classes and functions for working with factorized tensors.
+# core is a submodule (python file: core.py) of tltorch.factorized_tensors that provides the base class FactorizedTensor.
+# FactorizedTensor is a base class for all factorized tensor types (e.g., CP (cp.py), Tucker (tucker.py), TT (tt.py)). 
+# It provides methods for creating, initializing, and manipulating factorized tensors. 
+# All factorizations inherit from this base class "FactorizedTensor".
+# core -> toolbox. FactorizedTensor -> main tool inside the toolbox. 
+# cp.py, tucker.py, tt.py -> specific tools for specific tensor factorizations.
 
 from .base_spectral_convolution import BaseSpectralConv
+# . means from the current package, i.e. awfno/layers. base_spectral_convolution.py is a sibling file of this file.
+# BaseSpectralConv is a base class for spectral convolution layers. It provides common functionality and 
+# interface for spectral convolution layers, such as handling device placement and common methods for forward passes.
+ 
 tl.set_backend("pytorch")
+# tl.set_backend("pytorch") sets the backend for tensorly to use PyTorch.
+'''
+tl.set_backend("pytorch") means: "Whenever tensorly does tensor operations, use PyTorch under the hood."
+
+1. With the above line:
+import tensorly as tl
+tl.set_backend("pytorch")   # from now on, use PyTorch
+x = tl.tensor([1.0, 2.0, 3.0])
+type(x)   # → torch.Tensor   (not numpy array)
+
+2. Without the above line:
+# default backend is numpy
+x = tl.tensor([1.0, 2.0, 3.0])
+type(x)   # → numpy.ndarray
+
+'''
 use_opt_einsum("optimal")
+# use_opt_einsum("optimal") tells tensorly to use the optimized einsum implementation for tensor multiplications and contractions.
+
 einsum_symbols = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+#  einsum_symbols is a sequence of characters that can be used as symbols in Einstein summation notation for tensor operations.
+# For example, in an einsum operation like tl.einsum('abc,cd->abd', A, B), the characters 'a', 'b', 'c', 'd' 
+# represent the dimensions of the tensors A and B, and how they are contracted together.
 
 
 def _contract_dense(x, weight, separable=False):
@@ -23,36 +83,94 @@ def _contract_dense(x, weight, separable=False):
     If separable=False, performs a matrix multiplication along the channel dimension.
     """
     order = tl.ndim(x)
-    # batch-size, in_channels, x, y...
+    # tl.ndim(x) returns the number of dimensions (order) of the input tensor x.
+    # 2-D input x will have 4 dimensions (order  = 4) as : batch-size, in_channels, x, y
+    
     x_syms = list(einsum_symbols[:order])
+    # einsum_symbols is a string of characters and [:order] = [:4] = "abcd" .i.e. first 4 characters of einsum_symbols.
+    # list(einsum_symbols[:order]) = list("abcd") = ['a', 'b', 'c', 'd'] = x_syms 
+    # x_syms is a list of characters representing the dimensions of x.
 
-    # in_channels, out_channels, x, y...
+   
     weight_syms = list(x_syms[1:])  # no batch-size
+    # weight_syms = list(x_syms[1:]) = list(['b', 'c', 'd']) = ['b', 'c', 'd'] 
+    # x_syms[1:] means including second element of x_syms to the end. i.e. ['b', 'c', 'd'] = in_channels, x, y.
 
-    # batch-size, out_channels, x, y...
-    if separable:
+   
+    if separable: # separable=True then following line is executed. 
         out_syms = [x_syms[0]] + list(weight_syms)
-    else:
+        # out_syms = [x_syms[0]] + list(weight_syms) = ['a'] + ['b', 'c', 'd'] = ['a', 'b', 'c', 'd']
+        # When separable = True, then weight_syms represents "in_channels, x, y" and it is ['b', 'c', 'd'].
+        # When separable = True, then out_syms represents "batch_size, in_channels, x, y.
+        # Here, (in_channels = out_channels). Hence, out_syms is also called as batch_size, out_channels, x, y.
+        # and it(out_syms) is ['a', 'b', 'c', 'd'].
+        
+    else: # separable=False then following line is executed.
         weight_syms.insert(1, einsum_symbols[order])  # outputs
-        out_syms = list(weight_syms)
-        out_syms[0] = x_syms[0]
+        # einsum_symbols[order] = einsum_symbols[4] = 'e' (the 5th character, since indexing starts at 0)
+        # weight_syms.insert(1, 'e') means insert 'e' at index 1 of weight_syms.
+        # weight_syms was ['b', 'c', 'd'] and after insertion becomes ['b', 'e', 'c', 'd'].
+        # When separable = False, then weight_syms represents "in_channels, out_channels, x, y".
+
+        out_syms = list(weight_syms) # out_syms = list(weight_syms) = ['b', 'e', 'c', 'd']
+        out_syms[0] = x_syms[0] # out_syms = ['a', 'e', 'c', 'd'] 
+        # When separable = False, then out_syms represents "batch_size, out_channels, x, y".
 
     eq = f'{"".join(x_syms)},{"".join(weight_syms)}->{"".join(out_syms)}'
+    # eq is the Einstein summation equation that defines how the input tensor x and the weight tensor are contracted together.
+    # Case i) separable=True:
+    # x_syms = ['a', 'b', 'c', 'd']  (batch_size, in_channels, x, y)
+    # weight_syms = ['b', 'c', 'd']  (in_channels, x, y)
+    # out_syms = ['a', 'b', 'c', 'd'] (batch_size, out_channels, x, y)
+    # eq = 'abcd,bcd->abcd'  (element-wise multiplication in Fourier space).
+    # For this einsum, No summation happens along any dimension, just element-wise multiplication.
+    # As, weight_syms does not have out_channels dimension, so output channels equal input channels automatically.
+    # Case ii) separable=False:
+    # x_syms = ['a', 'b', 'c', 'd']  (batch_size, in_channels, x, y)
+    # weight_syms = ['b', 'e', 'c', 'd']  (in_channels, out_channels, x, y)
+    # out_syms = ['a', 'e', 'c', 'd'] (batch_size, out_channels, x, y)
+    # eq = 'abcd,becd->aecd'  (matrix multiplication along in_channels dimension in Fourier space).
+    # For this einsum, summation happens along the in_channels dimension (symbol 'b'), which is the second dimension 
+    # of x and the first dimension of weight. This corresponds to a matrix multiplication along the channel dimension 
+    # in Fourier space, while keeping the spatial dimensions (x, y) intact and it will be repeated for each spatial
+    # point ('c', 'd') and for each output channel ('e') and for each batch ('a').
 
-    if not torch.is_tensor(weight):
-        weight = weight.to_tensor()
+    if not torch.is_tensor(weight): # factorized tensors are not torch tensors, they are instances of FactorizedTensor class.
+    # Hence, if weight = factorized tensor then, this "if not torch.is_tensor(weight)" is True.
+
+        # if not : this phrase means that given condition is False, then execute the following line. 
+        # "if not" is opposite of "if". 
+        # torch.is_tensor() method in torch module checks if the given input is a PyTorch tensor.
+        #  It returns True if the input is a tensor and False otherwise.
+
+        weight = weight.to_tensor() 
+        # to_tensor() is a method of the FactorizedTensor class that reconstructs the full dense tensor from its
+        # factorized representation. If weight is a factorized tensor (e.g., CP, Tucker, TT), 
+        # this line will convert it to a full dense tensor that can be used for the contraction in Fourier space.
 
     if x.dtype == torch.complex32:
         # if x is half precision, run a specialized einsum
         return tl.einsum(eq, x, weight)
     else:
-        return tl.einsum(eq, x, weight)
+        return tl.einsum(eq, x, weight) # tl.einsum() is tensorly's implementation of Einstein summation. 
+    # for separable=True, einsum('abcd,bcd->abcd', x, weight) will perform element-wise multiplication in Fourier space.
+    # for separable=False, einsum('abcd,becd->aecd', x, weight) will perform matrix multiplication along 
+    # the in_channels dimension in Fourier space.
 
+'''
+Note: "tl.einsum(eq, x, weight)" is equivalent to "torch.einsum(eq, x, weight)" when the backend is set to "pytorch".
+.i.e. pytorch's einsum is used under the hood for the actual computation, 
+but we call it through tensorly's interface to maintain compatibility with factorized tensors 
+and to allow for potential future backends.
+'''
 
 def _contract_dense_separable(x, weight, separable):
     """
     Computes the contraction of dense separable weights with the input tensor x.
     This corresponds to element-wise multiplication in Fourier space.
+    This is equivalent to _contract_dense with separable=True, but it is provided as a separate function 
+    for "performance optimization", as it avoids the overhead of einsum string construction and parsing when we just 
+    want element-wise multiplication, this is directly given by x * weight.
     """
     if not torch.is_tensor(weight):
         weight = weight.to_tensor()
