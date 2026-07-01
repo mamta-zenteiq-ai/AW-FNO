@@ -48,7 +48,7 @@ Input (B, C_in, H, W)
 
 ---
 
-## Results (Navier-Stokes 2D, Re=1000, 64×64)
+<!-- ## Results (Navier-Stokes 2D, Re=1000, 64×64)
 
 | Model | Rel L2 ↓ | MSE ↓ | Params |
 |---|---|---|---|
@@ -59,7 +59,7 @@ Input (B, C_in, H, W)
 
 *Run `make paper-ready` to populate this table with trained checkpoints.*
 
----
+--- -->
 
 ## Quick Start
 

@@ -207,3 +207,8 @@ marimo/_lsp/
 __marimo__/
 
 results/*
+
+# Dataset files (large binary data, not for version control)
+awfno/data/burger/
+awfno/data/darcy/
+awfno/data/navier_stokes/
