@@ -218,6 +218,13 @@ venv/
 *.pt
 *.pth
 *.h5
+*.mat
+*.tgz
 data/
 datasets/
 outputs/
+
+# Dataset binary files (awfno/data/ has tracked Python loaders, so ignore subdirs explicitly)
+awfno/data/burger/
+awfno/data/darcy/
+awfno/data/navier_stokes/
