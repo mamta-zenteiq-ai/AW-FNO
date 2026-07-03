@@ -212,3 +212,7 @@ results/*
 awfno/data/burger/
 awfno/data/darcy/
 awfno/data/navier_stokes/
+
+# Paper and documentation (kept local, not version-controlled)
+docs/
+paper/
