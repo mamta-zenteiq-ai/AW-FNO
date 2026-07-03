@@ -1,0 +1,7 @@
+name,epoch,test_rel_l2,test_rel_h1,test_high_freq_rel_l2,test_mse,gate_entropy,dir
+FNO,500,0.03661183649301529,0.6481367273330688,nan,0.0006314672413282096,nan,/media/HDD/mamta_backup/aw_fno_results/fno_pdebench_burgers
+WNO,245,0.9331181750297547,1.8803226099014283,nan,0.2449904329776764,nan,/media/HDD/mamta_backup/aw_fno_results/wno_pdebench_burgers
+"AW-FNO (additive, v_F + v_W)",472,0.057877376049757005,0.9343789367675781,nan,0.0009632769376039505,nan,/media/HDD/mamta_backup/aw_fno_results/awfno_pdebench_burgers_additive
+"AW-FNO (fixed gate, α=0.5)",475,0.0529959497153759,0.8918098754882813,nan,0.000829576020129025,nan,/media/HDD/mamta_backup/aw_fno_results/awfno_pdebench_burgers_no_gate
+"AW-FNO (1×1 adaptive gate, λ_ent=0.01)",482,0.04534292647242546,0.7938104333877564,nan,0.0007505059950053692,0.5992751866579056,/media/HDD/mamta_backup/aw_fno_results/awfno_pdebench_burgers
+"AW-FNO (rich gate k=5, 2L, λ_ent=0.01)",480,0.033113882288336755,0.7323642663955688,nan,0.0004254656981211156,0.229983888566494,/media/HDD/mamta_backup/aw_fno_results/awfno_pdebench_burgers_richgate

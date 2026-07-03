@@ -143,8 +143,6 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-awfno_venv/
-awfno.egg-info/
 
 # Spyder project settings
 .spyderproject
@@ -210,21 +208,11 @@ __marimo__/
 
 results/*
 
-# Ignore python virtual environments
-venv/
-.venv/
-
-# Ignore massive data and model weight files
-*.pt
-*.pth
-*.h5
-*.mat
-*.tgz
-data/
-datasets/
-outputs/
-
-# Dataset binary files (awfno/data/ has tracked Python loaders, so ignore subdirs explicitly)
+# Dataset files (large binary data, not for version control)
 awfno/data/burger/
 awfno/data/darcy/
 awfno/data/navier_stokes/
+
+# Paper and documentation (kept local, not version-controlled)
+docs/
+paper/

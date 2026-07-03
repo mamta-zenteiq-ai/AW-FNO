@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 import matplotlib.pyplot as plt
+import numpy as np
+import random
 import os
 import sys
 import time
@@ -15,16 +17,28 @@ if PROJECT_ROOT not in sys.path:
 from awfno.models.wno import WNO1d
 from awfno.utils.unit_gaussian_normalization import UnitGaussianNormalizer
 from awfno.utils.losses import LpLoss
+from awfno.utils.seed import set_seed
 
 def train_burgers():
+    # 0. Reproducibility
+    seed = 42
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
     # 1. Configuration
+    set_seed(42)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
-    epochs = 100
+    epochs = 500
     batch_size = 32
     learning_rate = 1e-3
-    print_every = 10
+    print_every = 50
     
     data_path = '/media/HDD/mamta_backup/datasets/fno/burgers'
     results_dir = os.path.join(PROJECT_ROOT, 'results', 'wno_burgers')
@@ -65,7 +79,8 @@ def train_burgers():
         size=(128,),
         level=3,
         n_layers=4,
-        padding=0
+        padding=0,
+        wavelet='db6'
     ).to(device)
     
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)

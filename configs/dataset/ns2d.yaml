@@ -1,0 +1,34 @@
+# Navier-Stokes 2D dataset configuration
+name: ns2d
+
+# Path to data directory; override via --data_path or DATA_PATH env var
+data_path: data/ns2d
+
+# Pre-split filenames (if present) — used when raw pt files exist
+train_file: ns_train_64.pt
+test_file: ns_test_64.pt
+
+# Full dataset filename (alternative when only one file exists)
+full_file: ns_V1e-3_N1000_T50.mat
+
+# Number of training / test samples
+n_train: 1000
+n_test: 200
+
+# Spatial resolution
+resolution: 64
+
+# Number of input timesteps fed to the model
+T_in: 10
+
+# Number of output timesteps to predict
+T_out: 10
+
+# Batch size
+batch_size: 20
+
+# Random seed for train/test split reproducibility
+seed: 42
+
+# Normalisation strategy: unitgaussian or minmax
+normalisation: unitgaussian

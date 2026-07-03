@@ -1,0 +1,29 @@
+# Ablation: AW-FNO with fixed gate α=0.5 on PDEBench Burgers Nu=0.001.
+# Tests if dual-branch architecture alone suffices, or if adaptive gating
+# is genuinely needed for shock localisation.
+experiment_name: awfno_pdebench_burgers_no_gate
+
+model: awfno_pdebench_burgers
+dataset: pdebench_burgers
+
+ablation_fixed_gate: true
+
+epochs: 500
+learning_rate: 1.0e-3
+weight_decay: 1.0e-4
+optimizer: adam
+scheduler: step
+scheduler_step_size: 100
+scheduler_gamma: 0.5
+
+seed: 42
+device: cuda
+amp: false
+grad_clip: 1.0
+
+log_every: 25
+save_every: 100
+use_wandb: false
+wandb_project: aw-fno
+
+output_dir: /media/HDD/mamta_backup/aw_fno_results/awfno_pdebench_burgers_no_gate

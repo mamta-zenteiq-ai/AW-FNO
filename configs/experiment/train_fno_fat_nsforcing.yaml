@@ -1,0 +1,28 @@
+# Parameter-matched "fat" FNO baseline on the NS-forcing 128×128 SR task.
+# hidden_channels=128 (vs 32 for the standard FNO baseline). Answers the
+# reviewer fairness question: does extra FNO capacity alone close the gap to
+# AW-FNO? (Plan A1.)
+experiment_name: fno_fat_nsforcing_sr
+
+model: fno_ns128_fat
+dataset: nsforcing_sr
+
+epochs: 500
+learning_rate: 1.0e-3
+weight_decay: 1.0e-4
+optimizer: adam
+scheduler: step
+scheduler_step_size: 100
+scheduler_gamma: 0.5
+
+seed: 42
+device: cuda
+amp: false
+grad_clip: 1.0
+
+log_every: 25
+save_every: 100
+use_wandb: false
+wandb_project: aw-fno
+
+output_dir: results/fno_fat_nsforcing_sr

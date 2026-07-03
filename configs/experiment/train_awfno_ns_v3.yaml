@@ -1,0 +1,38 @@
+# AW-FNO third variant: random gate init only, NO entropy penalty.
+#
+# Goal: isolate whether the v2 (fixed) run's underperformance is caused by:
+#   (a) the entropy penalty (λ=0.01) distorting the data fit, or
+#   (b) the adaptive gate fundamentally not helping for this task.
+#
+# Setup vs `train_awfno_ns_fixed.yaml`:
+#   • lambda_ent: 0.0  (no entropy penalty)
+#   • Random Gaussian gate init still active (from the awfno.py source patch)
+#
+# Comparison after this run:
+#   • If v3 beats fixed-gate (0.000143)  → adaptive gate helps; penalty was bad
+#   • If v3 still ≥ fixed-gate           → adaptive gate doesn't help here
+experiment_name: awfno_ns_v3
+model: awfno_ns
+dataset: ns2d
+
+lambda_ent: 0.0      # no penalty, just random-init symmetry break
+
+epochs: 500
+learning_rate: 1.0e-3
+weight_decay: 1.0e-4
+optimizer: adam
+scheduler: step
+scheduler_step_size: 100
+scheduler_gamma: 0.5
+
+seed: 42
+device: cuda
+amp: false
+grad_clip: 1.0
+
+log_every: 25
+save_every: 100
+use_wandb: false
+wandb_project: aw-fno
+
+output_dir: /media/HDD/mamta_backup/aw_fno_results/awfno_ns_v3

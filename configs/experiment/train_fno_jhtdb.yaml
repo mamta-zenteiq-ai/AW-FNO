@@ -1,0 +1,25 @@
+# FNO baseline on JHTDB isotropic turbulence 128^2 super-resolution.
+experiment_name: fno_jhtdb_sr
+
+model: fno_ns128
+dataset: jhtdb_iso_sr
+
+epochs: 300
+learning_rate: 1.0e-3
+weight_decay: 1.0e-4
+optimizer: adam
+scheduler: step
+scheduler_step_size: 100
+scheduler_gamma: 0.5
+
+seed: 42
+device: cuda
+amp: false
+grad_clip: 1.0
+
+log_every: 25
+save_every: 100
+use_wandb: false
+wandb_project: aw-fno
+
+output_dir: results/fno_jhtdb_sr

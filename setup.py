@@ -5,7 +5,7 @@ setup(
     version="0.1.0",
     description="Adaptive Wavelet-Fourier Neural Operator",
     author="Mamta",
-    packages=find_packages(exclude=["scripts", "scripts.*", "data", "data.*"]),
+    packages=find_packages(),
     install_requires=[
         "torch",
         "numpy",

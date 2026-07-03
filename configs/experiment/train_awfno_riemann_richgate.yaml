@@ -1,0 +1,33 @@
+# AW-FNO with the RICH GATE (k=5, 2-layer Conv1d) on PDEBench 1D Riemann
+# (shock-tube) density, initial->final. The multi-wave headline run: the gate
+# must route WNO at the shock AND contact discontinuity, FNO in the
+# rarefaction fan. Mitigations A (entropy penalty) + C (rich gate) kept.
+experiment_name: awfno_riemann_richgate
+
+model: awfno_pdebench_burgers
+dataset: pdebench_riemann
+
+lambda_ent: 0.01
+rich_gate:
+  kernel_size: 5
+  hidden_layers: 2
+
+epochs: 300
+learning_rate: 1.0e-3
+weight_decay: 1.0e-4
+optimizer: adam
+scheduler: step
+scheduler_step_size: 100
+scheduler_gamma: 0.5
+
+seed: 42
+device: cuda
+amp: false
+grad_clip: 1.0
+
+log_every: 25
+save_every: 100
+use_wandb: false
+wandb_project: aw-fno
+
+output_dir: results/awfno_riemann_richgate

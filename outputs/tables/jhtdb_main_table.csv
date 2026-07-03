@@ -1,0 +1,6 @@
+name,epoch,n_epochs,test_rel_l2,test_rel_h1,test_high_freq_rel_l2,test_enstrophy_err,gate_entropy
+Bicubic (no model),,,,,,,
+FNO,,,,,,,
+WNO,,,,,,,
+AW-FNO (fixed α=0.5),,,,,,,
+"AW-FNO (rich gate, k=5, 2L)",,,,,,,

@@ -1,0 +1,31 @@
+# Ablation: AW-FNO with the adaptive gate disabled (fixed alpha = 0.5) on
+# JHTDB isotropic turbulence 128^2 SR. The regime control: if this homogeneous
+# isotropic field favours uniform mixing, fixed-0.5 should track the rich gate
+# (as on NS-forcing); if the intermittent filaments need routing, the rich
+# gate should win (as on Burgers shocks).
+experiment_name: awfno_jhtdb_sr_no_gate
+
+model: awfno_ns128
+dataset: jhtdb_iso_sr
+
+ablation_fixed_gate: true
+
+epochs: 300
+learning_rate: 1.0e-3
+weight_decay: 1.0e-4
+optimizer: adam
+scheduler: step
+scheduler_step_size: 100
+scheduler_gamma: 0.5
+
+seed: 42
+device: cuda
+amp: false
+grad_clip: 1.0
+
+log_every: 25
+save_every: 100
+use_wandb: false
+wandb_project: aw-fno
+
+output_dir: results/awfno_jhtdb_sr_no_gate

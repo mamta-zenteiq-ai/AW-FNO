@@ -1,0 +1,51 @@
+# AW-FNO with RICHER GATE on PDEBench Burgers Nu=0.001 (shock regime).
+#
+# Mitigation C from docs/gate_entropy_mitigation.md.
+#
+# Test: does giving the gate spatial receptive field (so it CAN see |∂u/∂x|
+# at multiple positions) make it learn to route WNO at shock locations?
+#
+# Gate architecture (1D):
+#   Conv1d(2C → C, k=5, pad=2)  →  GELU  →  Conv1d(C → C, k=5, pad=2)  →  Sigmoid
+#   effective receptive field: ±4 pixels (window of 9) — captures Burgers
+#   shock width (~5-10 pixels)
+#
+# Companion to:
+#   - configs/experiment/train_awfno_pdebench_burgers.yaml  (1×1 gate, ρ ≈ 0.03)
+#
+# Hypothesis:
+#   - rel_l2 ≤ 0.045 (improves on 1×1 gate's 0.0453)
+#   - ρ((1-α), |∂u/∂x|) ≥ 0.3 at deepest block (the original paper claim)
+
+experiment_name: awfno_pdebench_burgers_richgate
+
+model: awfno_pdebench_burgers
+dataset: pdebench_burgers
+
+# Mitigation A: keep entropy penalty (proven to escape gate collapse)
+lambda_ent: 0.01
+
+# Mitigation C: richer gate
+rich_gate:
+  kernel_size: 5
+  hidden_layers: 2
+
+epochs: 500
+learning_rate: 1.0e-3
+weight_decay: 1.0e-4
+optimizer: adam
+scheduler: step
+scheduler_step_size: 100
+scheduler_gamma: 0.5
+
+seed: 42
+device: cuda
+amp: false
+grad_clip: 1.0
+
+log_every: 25
+save_every: 100
+use_wandb: false
+wandb_project: aw-fno
+
+output_dir: /media/HDD/mamta_backup/aw_fno_results/awfno_pdebench_burgers_richgate

@@ -108,7 +108,7 @@ def train_burgers_awfno_h1():
     print_every = 100
     beta = 0.1  # Weight for H1 derivative term
     
-    data_path = '/home/parikshit/AW-FNO/awfno/data/burger'  
+    data_path = '/media/HDD/mamta_backup/datasets/fno/burgers'  
     '''
     This is hardcoded for the particular euclid system. 
     It points to the location where the preprocessed Burgers dataset is stored. 

@@ -1,0 +1,12 @@
+name: burgers1d
+
+data_path: data/burgers1d
+train_file: burgers_data_R10.mat
+test_file: null          # split from train file
+
+n_train: 1000
+n_test: 200
+resolution: 1024
+batch_size: 20
+seed: 42
+normalisation: unitgaussian

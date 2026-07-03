@@ -1,8 +1,12 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
+from torch.optim.lr_scheduler import StepLR
 import matplotlib.pyplot as plt
+import numpy as np
+import random
 import os
 import sys
 import time
@@ -15,16 +19,28 @@ if PROJECT_ROOT not in sys.path:
 from awfno.models.fno import FNO
 from awfno.utils.unit_gaussian_normalization import UnitGaussianNormalizer
 from awfno.utils.losses import LpLoss
+from awfno.utils.seed import set_seed
 
 def train_burgers():
+    # 0. Reproducibility
+    seed = 42
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
     # 1. Configuration
+    set_seed(42)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
-    epochs = 100
+    epochs = 500
     batch_size = 32
     learning_rate = 1e-3
-    print_every = 10
+    print_every = 50
     
     data_path = '/media/HDD/mamta_backup/datasets/fno/burgers'
     results_dir = os.path.join(PROJECT_ROOT, 'results', 'fno_burgers')
@@ -62,34 +78,33 @@ def train_burgers():
         n_modes=(16,),
         in_channels=1,
         out_channels=1,
-        hidden_channels=64,
+        hidden_channels=192, # Adjusted for ~1.7M parameters
         n_layers=4,
         positional_embedding="grid",
-        use_channel_mlp=True,
+        non_linearity=F.relu,  # Original FNO paper uses ReLU
+        norm=None,             # No block normalization in original FNO
+        use_channel_mlp=False, # Disabled for fair comparison
         channel_mlp_dropout=0.0
     ).to(device)
     
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
+    # Paper: StepLR, halve every 100 epochs (Li et al. 2021, Table 1)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.5)
     
-    criterion_mse = nn.MSELoss()
-    criterion_rel = LpLoss(d=1, p=2, size_average=False)
+    criterion_rel = LpLoss(d=1, p=2, size_average=True)  # Returns mean rel-L2 per batch
     
     # 5. Training Loop
-    train_mse_history = []
-    train_rel_history = []
-    test_mse_history = []
-    test_rel_history = []
+    train_loss_history = []
+    test_loss_history = []
     
     y_normalizer.to(device)
     
-    print(f"Starting FNO 1D training on Burgers for {epochs} epochs...")
+    print(f"Starting FNO 1D ablation training (Rel L2) on Burgers for {epochs} epochs...")
     start_time = time.time()
     
     for epoch in range(1, epochs + 1):
         model.train()
-        train_mse = 0.0
-        train_rel = 0.0
+        train_loss = 0.0
         
         for batch_x, batch_y in train_loader:
             batch_x, batch_y = batch_x.to(device), batch_y.to(device)
@@ -97,24 +112,18 @@ def train_burgers():
             optimizer.zero_grad()
             out = model(batch_x)
             
-            loss = criterion_mse(out.view(out.size(0), -1), batch_y.view(batch_y.size(0), -1))
+            # Train using Relative L2 Loss
+            loss = criterion_rel(out.view(out.size(0), -1), batch_y.view(batch_y.size(0), -1))
             loss.backward()
             optimizer.step()
             
-            train_mse += loss.item()
-            out_decoded = y_normalizer.decode(out)
-            batch_y_decoded = y_normalizer.decode(batch_y)
-            train_rel += criterion_rel.rel(out_decoded, batch_y_decoded).item()
+            train_loss += loss.item()
             
-        train_mse /= len(train_loader)
-        train_rel /= len(train_loader.dataset)
-        
-        train_mse_history.append(train_mse)
-        train_rel_history.append(train_rel)
+        train_loss /= len(train_loader)  # Mean over batches (each batch already averaged)
+        train_loss_history.append(train_loss)
         
         # Validation
         model.eval()
-        test_mse = 0.0
         test_rel = 0.0
         with torch.no_grad():
             for batch_x, batch_y in test_loader:
@@ -122,46 +131,70 @@ def train_burgers():
                 out = model(batch_x)
                 out = y_normalizer.decode(out)
                 
-                test_mse += criterion_mse(out, batch_y).item()
-                test_rel += criterion_rel.rel(out, batch_y).item()
+                # Report error on decoded (original scale) data
+                test_rel += criterion_rel(out, batch_y).item()
                 
-        test_mse /= len(test_loader)
-        test_rel /= len(test_loader.dataset)
-        
-        test_mse_history.append(test_mse)
-        test_rel_history.append(test_rel)
+        test_rel /= len(test_loader)  # Mean over batches
+        test_loss_history.append(test_rel)
         
         scheduler.step()
         
         if epoch % print_every == 0 or epoch == 1:
             print(f"Epoch {epoch}/{epochs} | "
-                  f"Train MSE: {train_mse:.6f}, Rel L2: {train_rel:.6f} | "
-                  f"Test MSE: {test_mse:.6f}, Rel L2: {test_rel:.6f}")
+                  f"Train Rel L2: {train_loss:.6f} | "
+                  f"Test Rel L2: {test_rel:.6f}")
             
     total_time = time.time() - start_time
     print(f"Training completed in {total_time:.2f}s")
+    print(f"Final Test Relative L2 Error: {test_loss_history[-1]:.6f}")
     
     # 6. Plot Loss
     plt.figure(figsize=(12, 5))
     plt.subplot(1, 2, 1)
-    plt.plot(train_mse_history, label='Train MSE')
-    plt.plot(test_mse_history, label='Test MSE')
+    plt.plot(train_loss_history, label='Train Rel L2')
+    plt.plot(test_loss_history, label='Test Rel L2')
     plt.xlabel('Epoch')
-    plt.ylabel('MSE')
-    plt.title('FNO Burgers MSE Loss')
+    plt.ylabel('Loss (Rel L2)')
+    plt.title('FNO Burgers Training History')
     plt.legend()
     
     plt.subplot(1, 2, 2)
-    plt.plot(train_rel_history, label='Train Rel L2')
-    plt.plot(test_rel_history, label='Test Rel L2')
+    plt.semilogy(train_loss_history, label='Train Rel L2')
+    plt.semilogy(test_loss_history, label='Test Rel L2')
     plt.xlabel('Epoch')
-    plt.ylabel('Relative L2')
-    plt.title('FNO Burgers Relative L2 Loss')
+    plt.ylabel('Loss (Log Scale)')
+    plt.title('FNO Burgers Training History (Log)')
     plt.legend()
     
     plt.tight_layout()
     plt.savefig(os.path.join(results_dir, 'fno_burgers_loss_plot.png'))
     print(f"Loss plot saved to {os.path.join(results_dir, 'fno_burgers_loss_plot.png')}")
+    
+    # 7. Visualization of Results (Field Comparison)
+    model.eval()
+    with torch.no_grad():
+        # Get one sample from test set
+        sample_x, sample_y = next(iter(test_loader))
+        sample_x, sample_y = sample_x[0:1].to(device), sample_y[0:1].to(device)
+        pred_y = model(sample_x)
+        pred_y = y_normalizer.decode(pred_y)
+        
+        # Move to CPU for plotting
+        sample_y = sample_y.cpu().numpy().squeeze()
+        pred_y = pred_y.cpu().numpy().squeeze()
+        
+        plt.figure(figsize=(8, 5))
+        plt.plot(sample_y, label='Ground Truth', color='blue', linewidth=2)
+        plt.plot(pred_y, '--', label='FNO Prediction', color='red', linewidth=2)
+        plt.title(f'FNO Burgers 1D: GT vs Prediction (Rel L2: {test_loss_history[-1]:.4f})')
+        plt.xlabel('Spatial Domain')
+        plt.ylabel('u(x, T=1)')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        
+        field_plot_path = os.path.join(results_dir, 'fno_burgers_field_comparison.png')
+        plt.savefig(field_plot_path)
+        print(f"Field comparison plot saved to {field_plot_path}")
 
 if __name__ == "__main__":
     train_burgers()

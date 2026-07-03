@@ -1,0 +1,22 @@
+name: wno
+
+in_channels: 1
+out_channels: 1
+
+# WNO latent width (called 'width' in WNO paper)
+width: 32
+
+# Spatial grid size
+size: [64, 64]
+
+# Wavelet decomposition levels
+level: 2
+
+# Number of wavelet layers
+n_layers: 4
+
+# Wavelet family
+wavelet: db4
+
+# Spatial padding
+padding: 2

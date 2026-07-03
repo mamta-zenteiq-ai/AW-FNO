@@ -1,0 +1,16 @@
+{
+  "fusion_type": "dual",
+  "se_reduction": 4,
+  "downsample_factor": 4,
+  "lr_resolution": 256,
+  "hr_resolution": 1024,
+  "n_params": 2672323,
+  "rel_l2_per_field": {
+    "0": 0.051702599972486496,
+    "1": 0.17238007485866547,
+    "2": 0.029648223891854286
+  },
+  "epochs_trained": 500,
+  "batch_size": 16,
+  "learning_rate": 0.001
+}

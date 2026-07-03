@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+    branches: [main, m_arch, dev]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install CPU-only PyTorch first
+        run: |
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install dependencies
+        run: |
+          pip install pytorch-wavelets tensorly tltorch numpy scipy matplotlib pyyaml h5py tqdm pytest
+
+      - name: Run unit tests
+        run: |
+          python -m pytest tests/ -v --tb=short -x \
+            --ignore=tests/test_datasets.py  # dataset tests require disk I/O mocking
+
+      - name: Run dataset tests (synthetic data only)
+        run: |
+          python -m pytest tests/test_datasets.py -v --tb=short
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+      - run: pip install flake8 black
+      - name: flake8
+        run: |
+          flake8 awfno/ utils/ datasets/ experiments/ trainers/ \
+            --max-line-length 100 \
+            --extend-ignore E203,W503,E501 \
+            --exclude awfno/layers/__pycache__,awfno/models/__pycache__
+      - name: black --check
+        run: |
+          black --check awfno/models/ utils/ datasets/ experiments/ trainers/ \
+            --line-length 100 \
+            --extend-exclude "awfno/layers/" \
+            || true  # Warn only (don't block CI during active development)
+
+  smoke-test:
+    name: Smoke test (forward pass)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+      - run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install pytorch-wavelets tensorly tltorch numpy scipy matplotlib pyyaml pytest
+      - name: AWFNO2d forward pass
+        run: |
+          python -c "
+          import torch
+          import sys; sys.path.insert(0, '.')
+          from awfno.models import AWFNO2d
+          m = AWFNO2d(in_channels=1, out_channels=1, n_modes=(8,8), size=(32,32),
+                      hidden_channels=8, n_layers=2, wno_level=2)
+          x = torch.randn(2, 1, 32, 32)
+          y = m(x)
+          assert y.shape == (2, 1, 32, 32), f'Wrong shape: {y.shape}'
+          print('AWFNO2d OK:', y.shape)
+          "
+      - name: FNO forward pass
+        run: |
+          python -c "
+          import torch
+          import sys; sys.path.insert(0, '.')
+          from awfno.models import FNO
+          m = FNO(n_modes=(8,8), in_channels=1, out_channels=1, hidden_channels=8, n_layers=2)
+          y = m(torch.randn(2, 1, 32, 32))
+          assert y.shape == (2, 1, 32, 32)
+          print('FNO OK:', y.shape)
+          "
+      - name: WNO2d forward pass
+        run: |
+          python -c "
+          import torch
+          import sys; sys.path.insert(0, '.')
+          from awfno.models import WNO2d
+          m = WNO2d(in_channels=1, out_channels=1, width=8, size=(32,32), level=2, n_layers=2)
+          y = m(torch.randn(2, 1, 32, 32))
+          assert y.shape == (2, 1, 32, 32)
+          print('WNO2d OK:', y.shape)
+          "

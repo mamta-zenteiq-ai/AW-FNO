@@ -14,9 +14,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-# from awfno.models.awfno import AWFNO2d
-# from awfno.models.awfno_parallel import AWFNO2d, AWFNO2dDualGPU
-from awfno.models.awfno_finalagfm import AWFNO2dFinalAGFM
+from awfno.models.awfno import AWFNO2d
 from awfno.utils.unit_gaussian_normalization import UnitGaussianNormalizer
 from awfno.utils.losses import LpLoss
 from awfno.utils.seed import set_seed
@@ -69,12 +67,7 @@ class SobolevLoss2d(object):
 def train_awfno_ns_h1():
     # 1. Configuration
     set_seed(42)
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    # Pins the default CUDA device for this process and all spawned threads.
-    # Without this, PyTorch's internal thread pool initialises worker threads
-    # with cuda:0 as their default context even when tensors live on cuda:1.
-    # if device.type == 'cuda':
-    #     torch.cuda.set_device(device)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
     epochs = 500
@@ -83,43 +76,19 @@ def train_awfno_ns_h1():
     print_every = 10
     beta = 0.1  # Weight for H1 derivative term
     
-    # data_path = '/home/parikshit/data_HIT/low_res_data_64x64'  #  --- IGNORE ---
-    data_path = '/home/parikshit/AW-FNO/awfno/data/navier_stokes'
+    data_path = '/media/HDD/mamta_backup/datasets/fno/navier_stokes'
     results_dir = os.path.join(PROJECT_ROOT, 'results', 'awfno_ns_h1')
     os.makedirs(results_dir, exist_ok=True)
     
-    # # Convert the given numpy files data to PyTorch tensors and save as .pt files if not already done
-    # train_np_path = os.path.join(data_path, 'train.npy')
-    # test_np_path = os.path.join(data_path, 'test.npy')
-    # # check the data files shape and format and which python data structure they contain (dict with 'x' and 'y' keys)
-    
-    # print(f'checking format and shape of {train_np_path} and {test_np_path}...')
-    # train_data_np = np.load(train_np_path, allow_pickle=True).item()
-    # test_data_np = np.load(test_np_path, allow_pickle=True).item()
-    # print(f"Train data format: {type(train_data_np)}")
-    # print(f"Test data format: {type(test_data_np)}")
-    # print(f"Train data shape: {train_data_np['x'].shape}")
-    # print(f"Test data shape: {test_data_np['x'].shape}")
-
-    # if not os.path.exists(os.path.join(data_path, 'nsforcing_train_64.pt')) or not os.path.exists(os.path.join(data_path, 'nsforcing_test_64.pt')):
-    #     # Convert numpy files to PyTorch tensors
-    #     train_data = np.load(train_np_path, allow_pickle=True).item()
-    #     test_data = np.load(test_np_path, allow_pickle=True).item()
-    #     torch.save(train_data, os.path.join(data_path, 'nsforcing_train_64.pt'))
-    #     torch.save(test_data, os.path.join(data_path, 'nsforcing_test_64.pt'))
-
-
-
     # 2. Load Data
-    print("Loading Navier-Stokes (128x128) data for AW-FNO-H1...")
-    train_data = torch.load(os.path.join(data_path, 'nsforcing_train_128.pt'))
-    test_data = torch.load(os.path.join(data_path, 'nsforcing_test_128.pt'))
+    print("Loading Navier-Stokes (64x64) data for AW-FNO-H1...")
+    train_data = torch.load(os.path.join(data_path, 'ns_train_64.pt'))
+    test_data = torch.load(os.path.join(data_path, 'ns_test_64.pt'))
     
     x_train = train_data['x'].float()
     y_train = train_data['y'].float()
     x_test = test_data['x'].float()
     y_test = test_data['y'].float()
-    print(f"Loaded data shapes - x_train: {x_train.shape}, y_train: {y_train.shape}, x_test: {x_test.shape}, y_test: {y_test.shape}")
 
     if x_train.ndim == 3:
         x_train = x_train.unsqueeze(1)
@@ -139,47 +108,16 @@ def train_awfno_ns_h1():
     test_loader = DataLoader(TensorDataset(x_test, y_test), batch_size=batch_size, shuffle=False)
     
     # 4. Model, Optimizer, Loss
-    # model = AWFNO2d(
-    #     in_channels=1,
-    #     out_channels=1,
-    #     n_modes=(24, 24),
-    #     size=(128, 128),
-    #     hidden_channels=64,
-    #     n_layers=4,
-    #     positional_embedding="grid"
-    # ).to(device)
-
-    # AW-FNO with single AGFM at the end — two independent T-layer branches,
-    # fused once after both finish (matches LaTeX description exactly).
-    # c_gated=1  → spatial gating (empirically better, paper default).
-    # c_gated=64 → per-channel gating (set equal to hidden_channels).
-    model = AWFNO2dFinalAGFM(
+    model = AWFNO2d(
         in_channels=1,
         out_channels=1,
-        n_modes=(24, 24),
-        size=(128, 128),
+        n_modes=(12, 12),
+        size=(64, 64),
         hidden_channels=64,
         n_layers=4,
-        positional_embedding="grid",
-        c_gated=1,
+        positional_embedding="grid"
     ).to(device)
-
-    # For Parallelizing on 2 GPUs — uncomment below and comment out AWFNO2d block above
-    # IMPORTANT: do NOT call .to(device) here — AWFNO2dDualGPU places each
-    # sub-module on the correct GPU internally; calling .to() would move
-    # wno_conv back to cuda:0 and silently break the dual-GPU setup.
-    # model = AWFNO2dDualGPU(
-    #     in_channels=1,
-    #     out_channels=1,
-    #     n_modes=(24, 24),
-    #     size=(128, 128),
-    #     hidden_channels=64,
-    #     n_layers=4,
-    #     positional_embedding="grid",
-    #     fno_device='cuda:0',   # RTX A6000  — fno_conv + skip + fusion
-    #     wno_device='cuda:1',   # RTX 6000 Ada — wno_conv
-    # )
-
+    
     optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.5)
     

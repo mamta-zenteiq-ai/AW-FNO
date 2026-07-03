@@ -3,9 +3,12 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 import matplotlib.pyplot as plt
+import numpy as np
+import random
 import os
 import sys
 import time
+import numpy as np
 
 # Add project root to sys.path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -15,16 +18,28 @@ if PROJECT_ROOT not in sys.path:
 from awfno.models.awfno import AWFNO2d
 from awfno.utils.unit_gaussian_normalization import UnitGaussianNormalizer
 from awfno.utils.losses import LpLoss
+from awfno.utils.seed import set_seed
 
 def train_ns():
+    # 0. Reproducibility
+    seed = 42
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
     # 1. Configuration
+    set_seed(42)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
-    epochs = 100
+    epochs = 500
     batch_size = 20
     learning_rate = 1e-3
-    print_every = 10
+    print_every = 50
     
     data_path = '/media/HDD/mamta_backup/datasets/fno/navier_stokes'
     results_dir = os.path.join(PROJECT_ROOT, 'results', 'awfno_ns')
@@ -63,14 +78,15 @@ def train_ns():
         out_channels=1,
         n_modes=(12, 12),
         size=(64, 64),
-        hidden_channels=64, # Using 64 to match Burgers experiment capacity
+        hidden_channels=16, # Adjusted for ~7.2M parameters
         n_layers=4,
         padding=0,
-        dropout=0.0
+        dropout=0.0,
+        wno_wavelet='db6'
     ).to(device)
     
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.5)
     
     criterion_mse = nn.MSELoss()
     criterion_rel = LpLoss(d=2, p=2, size_average=False)
@@ -135,11 +151,12 @@ def train_ns():
         
         if epoch % print_every == 0 or epoch == 1:
             print(f"Epoch {epoch}/{epochs} | "
-                  f"Train MSE: {train_mse:.6f}, Rel L2: {train_rel:.6f} | "
-                  f"Test MSE: {test_mse:.6f}, Rel L2: {test_rel:.6f}")
+                  f"Train MSE: {train_mse:.8f}, Rel L2: {train_rel:.8f} | "
+                  f"Test MSE: {test_mse:.8f}, Rel L2: {test_rel:.8f}")
             
     total_time = time.time() - start_time
     print(f"Training completed in {total_time:.2f}s")
+    print(f"Final Test Relative L2 Error: {test_rel_history[-1]:.8f}")
     
     # 6. Plot Loss
     plt.figure(figsize=(12, 5))
@@ -162,6 +179,43 @@ def train_ns():
     plt.tight_layout()
     plt.savefig(os.path.join(results_dir, 'awfno_ns_loss_plot.png'))
     print(f"Loss plot saved to {os.path.join(results_dir, 'awfno_ns_loss_plot.png')}")
+    
+    # 7. Visualization of Results
+    model.eval()
+    with torch.no_grad():
+        sample_x, sample_y = next(iter(test_loader))
+        sample_x, sample_y = sample_x[0:1].to(device), sample_y[0:1].to(device)
+        pred_y = model(sample_x)
+        pred_y = y_normalizer.decode(pred_y)
+        
+        sample_y = sample_y.cpu().numpy().squeeze()
+        pred_y = pred_y.cpu().numpy().squeeze()
+        
+        plt.figure(figsize=(18, 5))
+        
+        # Ground Truth
+        plt.subplot(1, 3, 1)
+        plt.imshow(sample_y, cmap='jet')
+        plt.colorbar()
+        plt.title('Ground Truth')
+        
+        # Prediction
+        plt.subplot(1, 3, 2)
+        plt.imshow(pred_y, cmap='jet')
+        plt.colorbar()
+        plt.title('Prediction')
+        
+        # Absolute Error
+        plt.subplot(1, 3, 3)
+        error = np.abs(sample_y - pred_y)
+        plt.imshow(error, cmap='hot')
+        plt.colorbar()
+        plt.title(f'Absolute Pointwise Error\nMax Error: {np.max(error):.8f}')
+        
+        plt.tight_layout()
+        field_plot_path = os.path.join(results_dir, 'awfno_ns_field_comparison.png')
+        plt.savefig(field_plot_path)
+        print(f"Field plot saved to {field_plot_path}")
 
 if __name__ == "__main__":
     train_ns()

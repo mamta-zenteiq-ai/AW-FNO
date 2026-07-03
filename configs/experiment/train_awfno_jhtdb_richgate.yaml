@@ -1,0 +1,36 @@
+# AW-FNO with the RICH GATE (k=5, 2-layer Conv) on JHTDB isotropic turbulence
+# 128^2 super-resolution — the headline run for the turbulence-SR dataset.
+#
+# Tests whether the validated spatial routing (Burgers rho up to +0.32, and the
+# NS-forcing SR result) transfers to genuinely intermittent high-Re isotropic
+# turbulence, where the WNO branch should be routed to vortex-filament /
+# high-|grad u| regions. Mitigations A (entropy penalty) + C (rich gate) kept.
+experiment_name: awfno_jhtdb_sr_richgate
+
+model: awfno_ns128
+dataset: jhtdb_iso_sr
+
+lambda_ent: 0.01
+rich_gate:
+  kernel_size: 5
+  hidden_layers: 2
+
+epochs: 300
+learning_rate: 1.0e-3
+weight_decay: 1.0e-4
+optimizer: adam
+scheduler: step
+scheduler_step_size: 100
+scheduler_gamma: 0.5
+
+seed: 42
+device: cuda
+amp: false
+grad_clip: 1.0
+
+log_every: 25
+save_every: 100
+use_wandb: false
+wandb_project: aw-fno
+
+output_dir: results/awfno_jhtdb_sr_richgate

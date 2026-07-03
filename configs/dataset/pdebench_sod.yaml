@@ -1,0 +1,32 @@
+# PDEBench 1D Sod (compressible Navier-Stokes Riemann problems).
+#
+# Files: 1D_CFD_Sod{1,1.1,2,3,4,5,6}.hdf5  (PDEBench, already on disk).
+# Each file is a single simulation with shape (T_i, X=1024).
+# Across the 7 files: 359 total timesteps → 352 next-step pairs.
+#
+# Task: predict u(x, t+dt) from u(x, t), where u is the chosen variable.
+# Default variable is density (cleanest shock structure).
+#
+# Each Sod sim contains THREE features:
+#   1. Shock wave (sharp jump in ρ, p, Vx) — gate target → WNO
+#   2. Contact discontinuity (jump in ρ only) — gate target → WNO
+#   3. Rarefaction fan (smooth) — gate target → FNO
+#
+# Small dataset: useful for example / proof-of-concept; not a full training
+# benchmark.  Download bulk PDEBench compressible-NS file for that.
+name: pdebench_sod
+
+data_path: /media/HDD/mamta_backup/datasets/PDEBench/comp_ns/1d
+
+# Which variable(s) to predict: "density" (default), "vx", "pressure", "all"
+variable: density
+
+# Indices into the sorted file list that go to test split.
+# Default: index 6 = Sod6 (the long 201-timestep evolution).  Held out so
+# the test set sees a different IC regime from training.
+test_file_indices: [6]
+
+resolution: 1024
+batch_size: 16
+seed: 42
+normalisation: unitgaussian

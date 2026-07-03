@@ -1,0 +1,50 @@
+# AW-FNO with the RICH GATE (k=5, 2-layer Conv) on the NS-forcing 128×128
+# super-resolution task — THE PRIMARY PAPER CONTRIBUTION on the SR task.
+#
+# Mirrors the Phase 2.5 Burgers config (train_awfno_pdebench_burgers_richgate.yaml)
+# that validated spatial routing (ρ up to +0.32). This run answers the
+# headline question of Stage A1: does Phase 2.5's win transfer to 2D SR?
+#
+# Gate architecture (2D, applied via _patch_rich_gate in experiments/train.py):
+#   Conv2d(2C → C, k=5, pad=2) → GELU → Conv2d(C → C, k=5, pad=2) → Sigmoid
+#   effective receptive field: ±4 pixels (9×9 window) — enough spatial
+#   context to detect vortex-filament / sharp-gradient structure that a
+#   1×1 gate (zero spatial context) cannot express.
+#
+# Companion configs:
+#   - train_awfno_nsforcing.yaml          (1×1 adaptive gate — Phase 2's loser)
+#   - ablation_no_gate_nsforcing.yaml      (fixed α=0.5 — Phase 1's winner)
+#
+# Mitigations A (entropy penalty λ=0.01) and B (random gate init) kept.
+experiment_name: awfno_nsforcing_sr_richgate
+
+model: awfno_ns128
+dataset: nsforcing_sr
+
+# Mitigation A: entropy penalty (proven to produce decisive, spatial routing)
+lambda_ent: 0.01
+
+# Mitigation C: rich gate with spatial receptive field
+rich_gate:
+  kernel_size: 5
+  hidden_layers: 2
+
+epochs: 500
+learning_rate: 1.0e-3
+weight_decay: 1.0e-4
+optimizer: adam
+scheduler: step
+scheduler_step_size: 100
+scheduler_gamma: 0.5
+
+seed: 42
+device: cuda
+amp: false
+grad_clip: 1.0
+
+log_every: 25
+save_every: 100
+use_wandb: false
+wandb_project: aw-fno
+
+output_dir: results/awfno_nsforcing_sr_richgate

@@ -1,0 +1,30 @@
+name: aw-fno
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.10
+  - pytorch=2.2.0
+  - torchvision
+  - pytorch-cuda=11.8
+  - numpy=1.26
+  - scipy=1.12
+  - matplotlib=3.8
+  - h5py=3.10
+  - pyyaml=6.0
+  - tqdm=4.66
+
+  - pip:
+    - pytorch-wavelets==1.3.0
+    - tensorly==0.8.1
+    - tltorch==0.3.0
+    - wandb>=0.16
+    - tensorboard>=2.14
+    - requests>=2.31
+    - pytest>=7.4
+    - black>=23.0
+    - flake8>=6.0
+    - scipy>=1.12

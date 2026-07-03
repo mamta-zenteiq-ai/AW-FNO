@@ -1,0 +1,26 @@
+# AW-FNO on the NS-forcing 128×128 super-resolution task (4× SR).
+# This is the primary "super-resolution" experiment that justifies the paper title.
+experiment_name: awfno_nsforcing_sr
+
+model: awfno_ns128
+dataset: nsforcing_sr
+
+epochs: 500
+learning_rate: 1.0e-3
+weight_decay: 1.0e-4
+optimizer: adam
+scheduler: step
+scheduler_step_size: 100
+scheduler_gamma: 0.5
+
+seed: 42
+device: cuda
+amp: false
+grad_clip: 1.0
+
+log_every: 25
+save_every: 100
+use_wandb: false
+wandb_project: aw-fno
+
+output_dir: results/awfno_nsforcing_sr

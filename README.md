@@ -1,94 +1,111 @@
-# AW-FNO: An Adaptive Approach for Fluid Flow Super-Resolution via Gated Wavelet-Fourier Learning
+# AW-FNO: Adaptive Wavelet-Fourier Neural Operator
 
-**ICCFD13-2026-311** · Thirteenth International Conference on Computational Fluid Dynamics, Milan, Italy, July 6–10, 2026
-
-**Authors:** Mamta Saini\*, Parikshit Mahajan\*, Gazania Marine Jyrwa\*, Diya Nagchaudhury\* (\*Equal contribution)
-
-**Affiliation:** Department of Computational and Data Sciences, Indian Institute of Science, Bengaluru, India
+> **Paper:** *AW-FNO: An Adaptive approach for Fluid flow Super-resolution via Gated Wavelet-Fourier Learning*
+> Mamta Saini, Parikshit Mahajan, Gazania Marine Jyrwa, Diya Nagchaudhury
+> ICCFD13, Milan, Italy, July 2026
 
 ---
 
 ## Overview
 
-**AW-FNO** (Augmented Wavelet Fourier Neural Operator) is a hybrid neural operator for super-resolution of turbulent fluid flows. It combines the Fourier Neural Operator (FNO) and the Wavelet Neural Operator (WNO) in a **parallel dual-branch architecture**, coupled through a learned **Adaptive Gated Fusion Mechanism (AGFM)**.
+**AW-FNO** fuses the **Fourier Neural Operator** (FNO) and the **Wavelet Neural Operator** (WNO)
+with a learned **Adaptive Gated Fusion Mechanism** (GFM).
 
-The AGFM generates a spatially varying gate that dynamically routes:
-- the **FNO branch** in smooth, globally coherent regions
-- the **WNO branch** near sharp gradients and local discontinuities
+| Branch | Strength | Limitation (alone) |
+|---|---|---|
+| FNO (Fourier) | Global long-range correlations | Gibbs oscillations near sharp gradients |
+| WNO (Wavelet) | Localised multi-scale features | Misses global coherent structures |
+| **AW-FNO** | **Both — spatially decided** | — |
 
-This design overcomes the spectral smoothing and Gibbs oscillations of standalone FNO and the large-scale coherence deficits of standalone WNO.
+The gate α(x,y) ∈ (0,1) learns *where* to trust each branch:
 
-A practical property of AW-FNO is that disabling either branch through an architectural switch recovers the standalone behaviour of the other branch.
+```
+V_fused = α ⊙ V_FNO  +  (1 − α) ⊙ V_WNO
+α = σ(Conv1×1([V_FNO, V_WNO]))     ← per-spatial-location, per-channel
+```
+
+- **α ≈ 1** (smooth, large-scale flow) → FNO dominates
+- **α ≈ 0** (vortex cores, shear layers) → WNO dominates
 
 ---
 
 ## Architecture
 
-### 1. Fourier (FNO) Branch — Global spectral learning
-
-Applies FFT, truncates to $k_{\max}$ low-frequency modes, applies learnable complex weights $R_\phi$, then applies inverse FFT:
-
-$$v_{t+1}^{\text{FNO}} = \sigma\left(W_t(v_t)(x) + \mathcal{F}^{-1}\left(R_\phi \cdot \mathcal{F}(v_t)\right)(x) + b_t(x)\right)$$
-
-Captures smooth, long-range, globally coherent features efficiently via $O(n \log n)$ FFT.
-
-### 2. Wavelet (WNO) Branch — Local multi-resolution learning
-
-Applies DWT (Daubechies wavelets), applies learnable weights in wavelet space, then applies inverse DWT:
-
-$$v_{t+1}^{\text{WNO}} = \sigma\left(W_t(v_t)(x) + \mathcal{W}^{-1}\left(R_\phi \cdot \mathcal{W}(v_t)\right)(x) + b_t(x)\right)$$
-
-Captures sharp gradients, local discontinuities, and multi-scale structures simultaneously localized in space and frequency.
-
-### 3. Adaptive Gated Fusion Mechanism (AGFM)
-
-The two branch outputs $v_{\text{FNO}}, v_{\text{WNO}} \in \mathbb{R}^{B \times H \times W \times C}$ are fused via a learned spatial gate:
-
-$$\alpha = \sigma\left(\text{Conv}_{n \times n}([v_{\text{FNO}}, v_{\text{WNO}}])\right)$$
-
-$$v_{\text{fused}} = \alpha \odot v_{\text{FNO}} + (1 - \alpha) \odot v_{\text{WNO}}$$
-
-Where $\alpha \approx 1$ in smooth regions (FNO dominates) and $\alpha \approx 0$ near sharp features (WNO dominates). Empirically, a spatial gate ($C_{\text{gated}} = 1$) with a $1 \times 1$ convolutional filter works well.
+```
+Input (B, C_in, H, W)
+  │  GridEmbedding2D  →  append (x,y) coords
+  │  Lifting MLP      →  (B, C_hid, H, W)
+  │
+  ├─ [AWFNOBlock2d] × L
+  │    │ SpectralConv2d  →  V_fno    # FFT → filter → IFFT
+  │    │ WaveConv2d      →  V_wno    # DWT → filter → IDWT
+  │    │ GFM: α = σ(Conv1×1([V_fno, V_wno]))
+  │    │ V_out = α⊙V_fno + (1−α)⊙V_wno + skip
+  │    └ LayerNorm + GELU
+  │
+  └  Projection MLP   →  (B, C_out, H, W)
+```
 
 ---
 
-<!-- ## Theoretical Foundation
+<!-- ## Results (Navier-Stokes 2D, Re=1000, 64×64)
 
-Grounded in **Multiresolution Analysis (MRA)**, any $f \in L^2(\mathbb{R})$ can be decomposed as:
+| Model | Rel L2 ↓ | MSE ↓ | Params |
+|---|---|---|---|
+| FNO | — | — | — |
+| WNO | — | — | — |
+| AW-FNO (no gate) | — | — | — |
+| **AW-FNO (ours)** | **—** | **—** | — |
 
-$$f(x) = \sum_{k} \langle f, \phi_{j_0,k}\rangle\, \phi_{j_0,k}(x) + \sum_{j \ge j_0} \sum_{k} \langle f, \psi_{j,k}\rangle\, \psi_{j,k}(x)$$
-
-where $\phi$ (scaling function) captures smooth approximations and $\psi$ (mother wavelet) captures localized detail at each scale $j$. The FNO branch approximates the first sum; the WNO branch approximates the second.
+*Run `make paper-ready` to populate this table with trained checkpoints.*
 
 --- -->
 
-## Results
+## Quick Start
 
-All models trained with Adam optimizer, 500 epochs, learning rate $10^{-3}$, StepLR scheduler (step 100, factor 0.5), weight decay $10^{-4}$, 4 layers per branch, on an NVIDIA RTX A6000 GPU.
+### 1. Install
 
-| Benchmark | Metric | AW-FNO | FNO | WNO |
-|-----------|--------|--------|-----|-----|
-| Navier–Stokes 2D | Max pointwise abs. error | **0.0569** | 0.0589 | 1.4872 |
-| Navier–Stokes 2D | Mean rel. $L_2$ error | 0.0195 | **0.0169** | 0.5180 |
-| Burgers (discontinuity) | Mean rel. $L_2$ error | **0.0007** | 0.0315 | 0.0032 |
-| Darcy (triangular notch) | Mean rel. $L_2$ error | **0.0047** | 0.0083 | 0.0057 |
-| HIT super-resolution 4× | PSNR / SSIM | **57.40 dB / 0.9991** | 54.38 dB / 0.9985 | 48.98 dB / 0.9944 |
+```bash
+git clone https://github.com/mamta-zenteiq-ai/AW-FNO.git
+cd AW-FNO
 
----
+# Conda (recommended)
+conda env create -f environment.yml
+conda activate aw-fno
 
-## Benchmarks
+# Or pip
+pip install -r requirements.txt
+```
 
-### 1D Burgers' Equation with Moving Discontinuity
-Maps vorticity over the first 11 time steps to the next 40 steps. AW-FNO tracks the sharp jump near $x=0$ more closely than FNO (which smooths it due to mode truncation) while matching smooth regions as well as WNO.
+### 2. Get data
 
-### 2D Darcy Flow on a Triangular Notch Domain
-Maps boundary conditions to pressure field on an irregular geometry with a slit interior boundary. AW-FNO attains lowest error, showing the gated fusion holds up with both smooth bulk regions and sharp notch features.
+```bash
+# Download FNO benchmark datasets (~300 MB)
+python datasets/download_fno_data.py --dataset ns2d
 
-### 2D Navier–Stokes on a Periodic Square Domain
-DNS data at $1024 \times 1024$ downsampled to $128 \times 128$, viscosity $\nu \in [2 \times 10^{-4}, 10^{-3}]$. AW-FNO achieves the lowest maximum pointwise error, reducing WNO's worst-case error by more than 25×.
+# Or if you already have the data:
+export DATA_PATH=/path/to/navier_stokes
+```
 
-### 4× Super-Resolution of Homogeneous Isotropic Turbulence (HIT)
-Maps $32 \times 32$ low-resolution input to $128 \times 128$ high-resolution field. AW-FNO outperforms both FNO and WNO baselines, recovering fine-scale vortical structures with high fidelity.
+### 3. Train a single model
+
+```bash
+# AW-FNO (proposed)
+make train-awfno DATA_PATH=/path/to/data
+
+# Baseline: FNO
+make train-fno DATA_PATH=/path/to/data
+
+# Baseline: WNO
+make train-wno DATA_PATH=/path/to/data
+```
+
+### 4. Full paper reproduction
+
+```bash
+# Trains all models, runs benchmark, generates all figures and tables
+DATA_PATH=/path/to/data make paper-ready
+```
 
 ---
 
@@ -96,45 +113,146 @@ Maps $32 \times 32$ low-resolution input to $128 \times 128$ high-resolution fie
 
 ```
 AW-FNO/
-├── awfno/                  # Core library
-│   ├── models/             # AW-FNO, FNO, WNO model definitions
-│   ├── layers/             # SpectralConv, WaveletConv, and supporting layers
-│   └── utils/              # Losses, normalization, scaling utilities
-├── examples/               # Per-benchmark training scripts (awfno/fno/wno × benchmark)
-├── results/                # Training logs and model checkpoints
-├── requirements.txt        # Python dependencies
-├── setup.py                # Installation script
-└── README.md
+├── awfno/                    # Core package
+│   ├── models/
+│   │   ├── awfno.py          # AW-FNO v1 (per-layer GFM) — paper primary
+│   │   ├── awfno_v2.py       # AW-FNO v2 (branch-parallel)
+│   │   ├── fno.py            # FNO baseline
+│   │   └── wno.py            # WNO baseline
+│   ├── layers/               # SpectralConv, WaveConv, embeddings
+│   └── utils/                # Normalisation, losses, seed
+│
+├── configs/
+│   ├── model/                # Per-model YAML configs
+│   ├── dataset/              # Dataset YAML configs
+│   └── experiment/           # Full experiment YAML configs
+│
+├── datasets/
+│   ├── ns2d.py               # NavierStokes2DDataset (PyTorch Dataset)
+│   ├── burgers1d.py          # Burgers1DDataset
+│   └── download_fno_data.py  # Automated dataset download
+│
+├── experiments/
+│   ├── train.py              # Unified training entry-point
+│   ├── evaluate.py           # Evaluation + metric reporting
+│   ├── benchmark.py          # Side-by-side model comparison
+│   └── ablation.py           # Ablation study driver
+│
+├── trainers/
+│   └── operator_trainer.py   # Training loop (AMP, grad-clip, CSV log)
+│
+├── utils/
+│   ├── metrics.py            # Rel-L2, MSE, MAE, spectral L2, MetricTracker
+│   ├── losses.py             # LpLoss, H1Loss, CombinedLoss
+│   ├── visualization.py      # Field plots, gate maps, PSD, convergence curves
+│   └── logging.py            # CSVLogger, get_logger
+│
+├── scripts/
+│   ├── reproduce_all.sh      # Full paper reproduction pipeline
+│   └── generate_paper_figures.py  # Figures + LaTeX tables
+│
+├── tests/                    # Pytest unit tests
+├── docs/                     # Research overview, dataset survey
+├── outputs/
+│   ├── figures/              # Generated paper figures (PDF/PNG)
+│   └── tables/               # LaTeX-ready .tex table files
+│
+├── Makefile                  # Shortcuts for all common tasks
+├── environment.yml           # Conda environment
+├── requirements.txt          # Pip requirements
+└── paper.tex                 # Paper source
 ```
 
 ---
 
-## Installation
+## Experiments
+
+### Train all models + run benchmark
 
 ```bash
-git clone https://github.com/mamta-zenteiq-ai/AW-FNO.git
-cd AW-FNO
-pip install -r requirements.txt
-pip install -e .
+# Full run (uses DATA_PATH env var)
+bash scripts/reproduce_all.sh
+
+# Individual steps
+python experiments/train.py --config configs/experiment/train_awfno_ns.yaml \
+    --data_path /path/to/data --epochs 500
+
+python experiments/benchmark.py --data_path /path/to/data --save_figures
 ```
+
+### Ablation study
+
+```bash
+# Run no-gate variant
+python experiments/train.py --config configs/experiment/ablation_no_gate.yaml \
+    --data_path /path/to/data
+
+# Collect all ablation results
+python experiments/ablation.py --data_path /path/to/data
+```
+
+### Evaluate a checkpoint
+
+```bash
+python experiments/evaluate.py \
+    --checkpoint results/awfno_ns/best.pt \
+    --config configs/experiment/train_awfno_ns.yaml \
+    --data_path /path/to/data \
+    --save_figures
+```
+
+---
+
+## Configuration
+
+All experiments are controlled by YAML files in `configs/`. Override any field via CLI:
+
+```bash
+python experiments/train.py \
+    --config configs/experiment/train_awfno_ns.yaml \
+    --epochs 200 \
+    --lr 5e-4 \
+    --output_dir results/awfno_ns_lr5e4
+```
+
+Key experiment config fields:
+
+| Field | Default | Description |
+|---|---|---|
+| `epochs` | 500 | Training epochs |
+| `learning_rate` | 1e-3 | Adam LR |
+| `scheduler_step_size` | 100 | StepLR decay step |
+| `scheduler_gamma` | 0.5 | StepLR decay factor |
+| `amp` | false | Automatic mixed precision |
+| `grad_clip` | 1.0 | Gradient clipping max-norm |
+| `seed` | 42 | Global random seed |
+
+---
+
+## Tests
+
+```bash
+make test                    # Run all unit tests
+python -m pytest tests/ -v   # Verbose
+```
+
+Tests cover: model forward passes, gradient flow, loss functions, metrics, dataset loading,
+normalizer roundtrips, and the no-gate ablation patch.
 
 ---
 
 ## Citation
 
-If you use this work, please cite:
-
-```
+```bibtex
 @inproceedings{saini2026awfno,
-  title     = {AW-FNO: An Adaptive Approach for Fluid Flow Super-Resolution
+  title     = {{AW-FNO}: An Adaptive approach for Fluid flow Super-resolution
                via Gated Wavelet-Fourier Learning},
   author    = {Saini, Mamta and Mahajan, Parikshit and Jyrwa, Gazania Marine
-               and Nagchaudhury, Diya},
-  booktitle = {Thirteenth International Conference on Computational Fluid
-               Dynamics (ICCFD13)},
-  address   = {Milan, Italy},
+               and Nagchaudhury, Diya and Ganesan, Sashikumaar},
+  booktitle = {Proceedings of the 13th International Conference on
+               Computational Fluid Dynamics (ICCFD13)},
   year      = {2026},
-  note      = {Paper ICCFD13-2026-311}
+  address   = {Milan, Italy},
 }
 ```
 
@@ -142,4 +260,14 @@ If you use this work, please cite:
 
 ## License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+MIT License — see [LICENSE](LICENSE) for details.
+
+---
+
+## Acknowledgements
+
+This work uses:
+- [neuraloperator](https://github.com/neuraloperator/neuraloperator) — spectral convolution layers
+- [pytorch-wavelets](https://github.com/fbcotter/pytorch_wavelets) — DWT implementation
+- [tensorly](https://github.com/tensorly/tensorly) / [tltorch](https://github.com/tensorly/torch) — tensor decomposition
+- FNO dataset from [Li et al. (2021)](https://arxiv.org/abs/2010.08895)

@@ -4,6 +4,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 import matplotlib.pyplot as plt
+import numpy as np
+import random
 import os
 import sys
 import time
@@ -19,6 +21,16 @@ from awfno.utils.losses import LpLoss
 from awfno.utils.seed import set_seed
 
 def train_burgers():
+    # 0. Reproducibility
+    seed = 42
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
     # 1. Configuration
     set_seed(42)  # — same hyperparameters as FNO baseline for fair comparison
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -29,7 +41,7 @@ def train_burgers():
     learning_rate = 1e-3
     print_every = 100
 
-    data_path = '/home/parikshit/AW-FNO/awfno/data/burger'
+    data_path = '/media/HDD/mamta_backup/datasets/fno/burgers'
     results_dir = os.path.join(PROJECT_ROOT, 'results', 'awfno_burgers')
     os.makedirs(results_dir, exist_ok=True)
 
